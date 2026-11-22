@@ -574,6 +574,14 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     multi = sum(1 for c in clusters if len(c["links"]) > 1)
     log(f"{len(clusters)} cards ({multi} with coverage from more than one link), similarity via {getattr(embed, 'method', 'n/a')}")
     log(f"{len(held)} held back ({single_outlet_held} single-outlet stories without an importance signal)")
+    shown_by, held_by = Counter(), Counter()
+    for c in clusters:
+        for o in {l["outlet"] for l in c["links"]}:
+            shown_by[o] += 1
+    for c in held:
+        held_by[c["links"][0]["outlet"]] += 1
+    log("   per outlet (cards shown / held): " + ", ".join(
+        f"{o} {shown_by[o]}/{held_by[o]}" for o in sorted(set(shown_by) | set(held_by), key=lambda o: -held_by[o])))
     for c in clusters:
         if c.get("signal"):
             log(f"   passed via {c['signal']}: [{c['links'][0]['outlet']}] {c['title'][:90]}")
