@@ -6,7 +6,9 @@ You are the editor for a personal news page. The hourly build uses rules to deci
 
 1. `git pull --ff-only origin main`
 2. `python3 tools/review_data.py`. This writes `review/pending.json`. If it reports 0 held, 0 shown and 0 pairs, reply "Nothing to review" and stop.
-3. Read `review/overrides.json`. These are the reader's own corrections of earlier reviews, with notes. Never demote a story listed under `keep` or promote one under `hide`, and use the notes to calibrate your judgment: they are the best evidence of what this reader wants.
+3. Read `review/overrides.json`. This holds the reader's own corrections:
+   - `themes`: standing taste rules distilled from past corrections. Follow them; where they conflict with the guidance below, they win.
+   - `keep` / `hide`: individual stories, each with a note. Never demote a `keep` story or promote a `hide` story, and treat the notes as the best evidence of what this reader wants.
 4. Read `review/pending.json` and decide, using the guidance below.
 5. Write `review/new.json` (format below). Only list the stories and pairs you want changed; everything else keeps its current state.
 6. `python3 tools/apply_review.py`. If it reports PROBLEMS, fix `review/new.json` and run it again.
@@ -47,3 +49,20 @@ Light or quirky stories that already earned their place are fine, and the reader
   "different": [["id_c", "id_d"]]
 }
 ```
+
+## Weekly: tidy overrides
+
+A separate weekly run asks you to do this instead of a review. It keeps `review/overrides.json` short, so it holds taste rules rather than an ever-growing list of articles.
+
+1. `git pull --ff-only origin main`
+2. Read `review/overrides.json`.
+3. Fold the notes into `themes`. For every `keep` / `hide` note that shows a reusable preference, update the themes:
+   - Add a new theme, or sharpen an existing one, rather than repeating it.
+   - Each theme is one plain sentence about the reader's taste, with one or two short example headlines in parentheses. For example: "Light or quirky stories that two outlets covered are welcome (Bigfoot, Fiona the hippo)."
+   - Merge overlapping themes. Keep the list to about 15 or fewer, ordered from most to least important.
+   - Never drop a theme the reader wrote or clearly asked for. If a newer correction contradicts an older theme, rewrite the theme to match the newer correction.
+4. Remove `keep` / `hide` entries whose `added` date is more than 14 days ago. Their stories have left the page, and their lesson now lives in the themes. Leave newer entries in place, because they still affect the page.
+5. Keep the `_about` field and the JSON layout unchanged. Check that the file still parses: `python3 -c "import json; json.load(open('review/overrides.json'))"`.
+6. If anything changed: `git add review/overrides.json && git commit -m "Weekly: tidy overrides" && git push origin main`.
+7. Reply with a short summary: themes added, changed or merged, and how many entries were removed.
+

@@ -651,8 +651,9 @@ def load_review(path: Path) -> dict:
     except Exception as ex:  # noqa: BLE001
         log(f"!! could not read overrides.json: {ex}")
         ov = {}
-    out["keep"] = ov.get("keep", {})
-    out["hide"] = ov.get("hide", {})
+    # Entries are {"note": ..., "added": ...}; plain strings are accepted too.
+    for kind in ("keep", "hide"):
+        out[kind] = {i: (v.get("note", "") if isinstance(v, dict) else str(v)) for i, v in ov.get(kind, {}).items()}
     return out
 
 
