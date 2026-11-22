@@ -32,6 +32,16 @@ Eno Sarris and Jesus Cano (Braves beat) come from their own author feeds and alw
 
 Nothing is thrown away: held stories are listed on the **Held back** tab with the reason. All rules live in `sources.yaml` (`gate`, `rumor_rules`, `drop_titles`, `pass_authors`, `pass_keywords`, and the shared `selection` patterns).
 
+## Claude review
+
+Twice a day (5:47 AM and 3:47 PM Eastern), a scheduled Claude Code session running Sonnet acts as editor for the stories the rules were unsure about. It runs on the Claude plan, with no API key. It:
+
+- **promotes** important stories the rules held back,
+- **demotes** fluff that slipped through (even when two outlets covered it),
+- **fixes merges** for story pairs near the similarity cutoff.
+
+It reads what to review from the build log (`tools/review_data.py`), records verdicts in `review/decisions.json` (`tools/apply_review.py`) and pushes, which rebuilds the page. Promoted cards carry a "Claude pick" label; demoted ones show on Held back with Claude's reason. It never touches ungated sources or allowed bylines. Its instructions, including what counts as important, are in `REVIEW.md`: edit that file to change its judgment. The schedule and the reviewer session are in claude.ai under scheduled tasks and sessions.
+
 ## The page
 
 - **Top Stories**: from the last 36 hours, stories covered by 2 or more outlets or flagged as NYT front page, WaPo The 7, a scoop or a feature. Biggest first.
