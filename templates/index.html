@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Daily Brief</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231f4e79'/><path d='M8 9h16M8 15h16M8 21h10' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>">
+<style>
+:root {
+  --bg: #f7f6f2; --card: #ffffff; --text: #1d1d1f; --muted: #6b6b70; --line: #e4e2dc;
+  --accent: #1f4e79; --accent-soft: #e6eef6; --chip: #f0efe9; --chip-text: #2b2b2e;
+  --new: #b4471f; --read: .5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141416; --card: #1d1d20; --text: #ececee; --muted: #9a9aa2; --line: #2e2e33;
+    --accent: #8db8e3; --accent-soft: #1f2a36; --chip: #2a2a2f; --chip-text: #dcdce0; --new: #f08a5d;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141416; --card: #1d1d20; --text: #ececee; --muted: #9a9aa2; --line: #2e2e33;
+  --accent: #8db8e3; --accent-soft: #1f2a36; --chip: #2a2a2f; --chip-text: #dcdce0; --new: #f08a5d;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+}
+a { color: inherit; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 16px 64px; }
+header { padding: 28px 0 8px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font: 700 28px/1.1 Georgia, "Times New Roman", serif; letter-spacing: -.01em; }
+.updated { color: var(--muted); font-size: 13px; }
+nav.tabs {
+  position: sticky; top: 0; z-index: 5; background: var(--bg);
+  display: flex; gap: 4px; overflow-x: auto; padding: 10px 0; border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+nav.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--bg); }
+.tab .n { font-weight: 500; opacity: .75; margin-left: 4px; font-size: 12px; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 0 4px; }
+.toolbar input[type=search] {
+  flex: 1 1 200px; min-width: 0; font: inherit; font-size: 14px; padding: 7px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text);
+}
+.btn {
+  font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: var(--muted); }
+.btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.day { margin: 22px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 8px 0;
+  transition: opacity .2s;
+}
+.card.read { opacity: var(--read); }
+.card .head { display: flex; gap: 10px; align-items: flex-start; }
+.card h2 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 650; flex: 1; }
+.card h2 a { text-decoration: none; }
+.card h2 a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.check {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: transparent;
+  color: var(--muted); cursor: pointer; display: grid; place-items: center; padding: 0; margin-top: -2px;
+}
+.check:hover { border-color: var(--muted); color: var(--text); }
+.card.read .check { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.summary { margin: 6px 0 0; color: var(--muted); font-size: 14.5px; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; text-decoration: none; background: var(--chip); color: var(--chip-text);
+  padding: 3px 9px; border-radius: 999px; font-weight: 550; font-size: 12.5px; max-width: 100%;
+}
+.chip:hover { background: var(--accent-soft); color: var(--accent); }
+.chip.lead { background: var(--accent-soft); color: var(--accent); }
+.when { color: var(--muted); margin-left: auto; white-space: nowrap; }
+.badge { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--new); }
+.multi { font-size: 12px; color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 48px 0; }
+.status-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px; }
+.status-table th, .status-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.status-table th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.ok { color: #2f7d4f; font-weight: 700; }
+.err { color: #c0392b; font-weight: 700; }
+.small { font-size: 12px; color: var(--muted); word-break: break-all; }
+h3 { margin: 28px 0 4px; font-size: 16px; }
+footer { margin-top: 40px; color: var(--muted); font-size: 12px; text-align: center; }
+@media (max-width: 520px) {
+  h1 { font-size: 24px; }
+  .card { padding: 12px 13px; }
+  .card h2 { font-size: 16px; }
+  .when { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Daily Brief</h1>
+    <span class="updated" id="updated"></span>
+  </header>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <div class="toolbar" id="toolbar">
+    <input type="search" id="q" placeholder="Search headlines" aria-label="Search headlines">
+    <button class="btn" id="hideRead" aria-pressed="false">Hide read</button>
+    <button class="btn" id="markAll">Mark all read</button>
+  </div>
+  <main id="main"></main>
+  <footer>Built from public RSS feeds. Read state is stored only in this browser.</footer>
+</div>
+<script>
+const DATA = /*__DATA__*/null;
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+// Read state: link id -> time read. Pruned after 8 days.
+const now = Date.now() / 1000;
+let read = store.get("read", {});
+for (const k in read) if (now - read[k] > 8 * 86400) delete read[k];
+store.set("read", read);
+
+// "New" = first seen after your previous visit (a visit = 30+ minutes since the last one).
+const visits = store.get("visits", { prev: 0, cur: 0 });
+if (now - visits.cur > 1800) { visits.prev = visits.cur; visits.cur = now; store.set("visits", visits); }
+
+let state = {
+  tab: store.get("tab", "top"),
+  hideRead: store.get("hideRead", false),
+  q: "",
+};
+
+const isRead = c => c.links.every(l => read[l.id]);
+const isNew = c => visits.prev && c.first_seen > visits.prev && !isRead(c);
+
+function rel(t) {
+  const s = now - t;
+  if (s < 3600) return Math.max(1, Math.round(s / 60)) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return Math.round(s / 86400) + "d ago";
+}
+function dayLabel(t) {
+  const d = new Date(t * 1000), today = new Date();
+  const y = new Date(); y.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === y.toDateString()) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Top stories: covered by 2+ outlets in the last 36 hours, biggest first.
+function topClusters() {
+  return DATA.clusters
+    .filter(c => c.outlets >= 2 && now - c.time < 36 * 3600)
+    .sort((a, b) => (b.outlets - a.outlets) || (b.time - a.time));
+}
+function clustersFor(tab) {
+  if (tab === "top") return topClusters();
+  if (tab === "all") return DATA.clusters;
+  return DATA.clusters.filter(c => c.section === tab);
+}
+
+function renderTabs() {
+  const tabs = [{ id: "top", label: "Top Stories" }, { id: "all", label: "Everything" }, ...DATA.sections, { id: "status", label: "Feeds" }];
+  const el = document.getElementById("tabs");
+  el.innerHTML = tabs.map(t => {
+    let n = "";
+    if (t.id !== "status") {
+      const unread = clustersFor(t.id).filter(c => !isRead(c)).length;
+      n = `<span class="n">${unread}</span>`;
+    } else {
+      const bad = DATA.status.filter(s => !s.ok).length;
+      if (bad) n = `<span class="n">${bad} down</span>`;
+    }
+    return `<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${state.tab === t.id}">${esc(t.label)}${n}</button>`;
+  }).join("");
+}
+
+function card(c) {
+  const seen = {};
+  const chips = c.links.map((l, i) => {
+    seen[l.outlet] = (seen[l.outlet] || 0) + 1;
+    const label = seen[l.outlet] > 1 ? `${l.outlet} ${seen[l.outlet]}` : l.outlet;
+    return `<a class="chip${i === 0 ? " lead" : ""}" href="${esc(l.url)}" target="_blank" rel="noopener" data-c="${c.id}" title="${esc(l.title)}">${esc(label)}</a>`;
+  }).join("");
+  const r = isRead(c);
+  return `<article class="card${r ? " read" : ""}" data-id="${c.id}">
+    <div class="head">
+      <h2><a href="${esc(c.links[0].url)}" target="_blank" rel="noopener" data-c="${c.id}">${esc(c.title)}</a></h2>
+      <button class="check" data-toggle="${c.id}" aria-label="${r ? "Mark unread" : "Mark read"}" title="${r ? "Mark unread" : "Mark read"}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3L13 4.5"/></svg>
+      </button>
+    </div>
+    ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ""}
+    <div class="meta">${isNew(c) ? '<span class="badge">New</span>' : ""}${chips}
+      ${c.links.length > 1 ? `<span class="multi">${c.outlets} outlet${c.outlets > 1 ? "s" : ""}</span>` : ""}
+      <span class="when">${rel(c.time)}</span>
+    </div>
+  </article>`;
+}
+
+function renderList() {
+  let list = clustersFor(state.tab);
+  if (state.hideRead) list = list.filter(c => !isRead(c));
+  if (state.q) {
+    const q = state.q.toLowerCase();
+    list = list.filter(c => c.links.some(l => l.title.toLowerCase().includes(q) || l.outlet.toLowerCase().includes(q)) || c.summary.toLowerCase().includes(q));
+  }
+  if (!list.length) return `<p class="empty">${state.hideRead ? "All caught up." : "Nothing here yet."}</p>`;
+  if (state.tab === "top") return list.map(card).join("");
+  let out = "", last = "";
+  for (const c of list) {
+    const d = dayLabel(c.time);
+    if (d !== last) { out += `<div class="day">${d}</div>`; last = d; }
+    out += card(c);
+  }
+  return out;
+}
+
+function renderStatus() {
+  const rows = DATA.status.map(s => `<tr>
+    <td>${s.ok ? '<span class="ok">✓</span>' : '<span class="err">✗</span>'}</td>
+    <td>${esc(s.name)}${s.url ? `<div class="small">${esc(s.url)}</div>` : ""}${s.errors.length ? `<div class="small">${s.errors.map(esc).join("<br>")}</div>` : ""}</td>
+    <td>${s.kept}</td><td>${s.filtered}</td></tr>`).join("");
+  const filtered = DATA.filtered.slice(0, 200).map(f => `<tr><td><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.title)}</a><div class="small">${esc(f.source)}</div></td><td class="small">${esc(f.why)}</td></tr>`).join("");
+  return `<table class="status-table"><thead><tr><th></th><th>Feed</th><th>Stories</th><th>Filtered</th></tr></thead><tbody>${rows}</tbody></table>
+    <h3>Filtered out this run</h3>
+    <p class="small">Opinion, cooking and wellness stories dropped from the NYT and WaPo feeds. Edit the rules in sources.yaml.</p>
+    <table class="status-table"><tbody>${filtered || '<tr><td class="small">None</td></tr>'}</tbody></table>`;
+}
+
+function render() {
+  renderTabs();
+  const status = state.tab === "status";
+  document.getElementById("toolbar").style.display = status ? "none" : "";
+  document.getElementById("hideRead").setAttribute("aria-pressed", state.hideRead);
+  document.getElementById("main").innerHTML = status ? renderStatus() : renderList();
+}
+
+function markRead(ids, value) {
+  const t = Date.now() / 1000;
+  for (const id of ids) { if (value) read[id] = t; else delete read[id]; }
+  store.set("read", read);
+}
+const byId = id => DATA.clusters.find(c => c.id === id);
+
+document.addEventListener("click", e => {
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { state.tab = tab.dataset.tab; store.set("tab", state.tab); render(); window.scrollTo({ top: 0 }); return; }
+  const tog = e.target.closest("[data-toggle]");
+  if (tog) { const c = byId(tog.dataset.toggle); markRead(c.links.map(l => l.id), !isRead(c)); render(); return; }
+  const link = e.target.closest("a[data-c]");
+  if (link) {
+    // Opening any link marks the whole story read; re-render after the new tab opens.
+    const c = byId(link.dataset.c);
+    markRead(c.links.map(l => l.id), true);
+    setTimeout(render, 300);
+  }
+});
+document.addEventListener("auxclick", e => {
+  const link = e.target.closest("a[data-c]");
+  if (link && e.button === 1) { markRead(byId(link.dataset.c).links.map(l => l.id), true); setTimeout(render, 300); }
+});
+document.getElementById("hideRead").onclick = () => { state.hideRead = !state.hideRead; store.set("hideRead", state.hideRead); render(); };
+document.getElementById("markAll").onclick = () => {
+  const list = clustersFor(state.tab);
+  if (!confirm(`Mark ${list.length} stories as read?`)) return;
+  markRead(list.flatMap(c => c.links.map(l => l.id)), true); render();
+};
+document.getElementById("q").oninput = e => { state.q = e.target.value.trim(); document.getElementById("main").innerHTML = renderList(); };
+
+document.getElementById("updated").textContent = "Updated " + new Date(DATA.generated * 1000).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+if (!["top", "all", "status", ...DATA.sections.map(s => s.id)].includes(state.tab)) state.tab = "top";
+if (state.tab === "top" && !topClusters().length) state.tab = "all";
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,274 @@
+# Personal news sources.
+#
+# Every source here is a PUBLIC RSS/Atom feed. Nothing needs a login.
+#
+# Fields:
+#   name      label shown on the status page
+#   outlet    label shown on the link chip (several feeds can share an outlet)
+#   section   which tab the story goes in (see `sections` below)
+#   urls      one or more candidate feed URLs, tried in order
+#   site      (optional) homepage, used to auto-discover a feed if every url fails
+#   filter    true = apply the `filters` rules below (used for the NYT/WaPo
+#             replacements for the morning-briefing emails). Feeds you picked
+#             on purpose, like Ezra Klein's column, are left alone.
+#   priority  (optional) lower = preferred as the headline when stories merge.
+#             Defaults to the order in this file.
+
+sections:
+  - {id: news,     label: "News"}
+  - {id: baseball, label: "Baseball"}
+  - {id: cars,     label: "Cars"}
+  - {id: misc,     label: "Policy & Ideas"}
+  - {id: science,  label: "Science"}
+  - {id: ai,       label: "AI"}
+
+sources:
+  # ---------- Replacements for the morning emails ----------
+  - name: NYT Top Stories (replaces the Morning Briefing)
+    outlet: NYT
+    section: news
+    filter: true
+    urls: [https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml]
+
+  - name: NYT U.S.
+    outlet: NYT
+    section: news
+    filter: true
+    urls: [https://rss.nytimes.com/services/xml/rss/nyt/US.xml]
+
+  - name: NYT Politics
+    outlet: NYT
+    section: news
+    filter: true
+    urls: [https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml]
+
+  - name: NYT Business
+    outlet: NYT
+    section: news
+    filter: true
+    urls: [https://rss.nytimes.com/services/xml/rss/nyt/Business.xml]
+
+  - name: WaPo National (replaces the headlines email)
+    outlet: WaPo
+    section: news
+    filter: true
+    urls: [https://feeds.washingtonpost.com/rss/national]
+
+  - name: WaPo Politics
+    outlet: WaPo
+    section: news
+    filter: true
+    urls: [https://feeds.washingtonpost.com/rss/politics]
+
+  - name: WaPo World
+    outlet: WaPo
+    section: news
+    filter: true
+    urls: [https://feeds.washingtonpost.com/rss/world]
+
+  - name: WaPo Business
+    outlet: WaPo
+    section: news
+    filter: true
+    urls: [https://feeds.washingtonpost.com/rss/business]
+
+  - name: Econvitals (Jason Furman)
+    outlet: Econvitals
+    section: misc
+    urls:
+      - https://econvitals.com/feed
+      - https://econvitals.com/rss.xml
+      - https://econvitals.substack.com/feed
+    site: https://econvitals.com
+
+  - name: MLB.com News (replaces MLB Morning Lineup)
+    outlet: MLB.com
+    section: baseball
+    urls: [https://www.mlb.com/feeds/news/rss.xml]
+
+  - name: The Athletic MLB (replaces Athletic emails)
+    outlet: The Athletic
+    section: baseball
+    urls: [https://www.nytimes.com/athletic/rss/mlb/]
+
+  # ---------- From Feedly: Baseball ----------
+  - name: Baseball Prospectus
+    outlet: Baseball Prospectus
+    section: baseball
+    urls: [https://www.baseballprospectus.com/feed/]
+    site: https://www.baseballprospectus.com
+
+  - name: ESPN MLB
+    outlet: ESPN
+    section: baseball
+    urls: [https://www.espn.com/espn/rss/mlb/news]
+
+  - name: FanGraphs
+    outlet: FanGraphs
+    section: baseball
+    urls: [https://blogs.fangraphs.com/feed/]
+    site: https://blogs.fangraphs.com
+
+  - name: Tangotiger Blog
+    outlet: Tangotiger
+    section: baseball
+    urls: [https://tangotiger.com/index.php/site/rss_2.0]
+    site: https://tangotiger.com
+
+  # ---------- From Feedly: Cars ----------
+  - name: Automotive News Breaking News
+    outlet: Automotive News
+    section: cars
+    urls:
+      - https://www.autonews.com/arc/outboundfeeds/rss/?outputType=xml
+      - https://www.autonews.com/rss/breaking-news
+      - https://www.autonews.com/rss.xml
+    site: https://www.autonews.com
+
+  - name: Classic Motorsports
+    outlet: Classic Motorsports
+    section: cars
+    urls:
+      - https://classicmotorsports.com/articles/rss/
+      - https://classicmotorsports.com/rss/
+    site: https://classicmotorsports.com
+
+  - name: GM Authority
+    outlet: GM Authority
+    section: cars
+    urls: [https://gmauthority.com/blog/feed/]
+    site: https://gmauthority.com
+
+  - name: Motor1 News
+    outlet: Motor1
+    section: cars
+    urls: [https://www.motor1.com/rss/news/all/]
+    site: https://www.motor1.com
+
+  - name: Car and Driver
+    outlet: Car and Driver
+    section: cars
+    urls: [https://www.caranddriver.com/rss/all.xml/]
+    site: https://www.caranddriver.com
+
+  - name: Petrolicious
+    outlet: Petrolicious
+    section: cars
+    urls:
+      - https://petrolicious.com/blogs/articles.atom
+      - https://petrolicious.com/feed
+    site: https://petrolicious.com
+
+  # ---------- From Feedly: Misc ----------
+  - name: Bridge Michigan
+    outlet: Bridge Michigan
+    section: news
+    urls:
+      - https://www.bridgemi.com/rss.xml
+      - https://www.bridgemi.com/feed
+    site: https://www.bridgemi.com
+
+  - name: Michigan Advance
+    outlet: Michigan Advance
+    section: news
+    urls: [https://michiganadvance.com/feed/]
+    site: https://michiganadvance.com
+
+  - name: NYT Ezra Klein
+    outlet: NYT (Ezra Klein)
+    section: misc
+    urls:
+      - https://www.nytimes.com/svc/collections/v1/publish/www.nytimes.com/column/ezra-klein/rss.xml
+
+  - name: NYT The Upshot
+    outlet: NYT
+    section: news
+    urls: [https://rss.nytimes.com/services/xml/rss/nyt/Upshot.xml]
+
+  - name: NYT World News
+    outlet: NYT
+    section: news
+    urls: [https://rss.nytimes.com/services/xml/rss/nyt/World.xml]
+
+  - name: People's Policy Project
+    outlet: People's Policy Project
+    section: misc
+    urls: [https://www.peoplespolicyproject.org/feed/]
+    site: https://www.peoplespolicyproject.org
+
+  - name: Physics Today
+    outlet: Physics Today
+    section: science
+    urls: [https://physicstoday.aip.org/index.rss]
+    site: https://physicstoday.aip.org
+
+  # ---------- From Feedly: AI ----------
+  - name: Last Week in AI
+    outlet: Last Week in AI
+    section: ai
+    urls: [https://lastweekin.ai/feed]
+    site: https://lastweekin.ai
+
+  - name: Latent Space
+    outlet: Latent Space
+    section: ai
+    urls: [https://www.latent.space/feed]
+    site: https://www.latent.space
+
+# Rules applied only to sources marked `filter: true`.
+# All matching is case-insensitive.
+filters:
+  # Any of these substrings in the article URL drops it.
+  url_contains:
+    - /opinion/
+    - /opinions/
+    - cooking.nytimes.com
+    - /food/
+    - /dining/
+    - /recipes/
+    - /well/
+    - /wellness/
+    - /wirecutter/
+  # Any of these feed category tags drops it.
+  categories:
+    - opinion
+    - opinions
+    - op-ed
+    - letters
+    - food
+    - cooking
+    - recipes
+    - well
+    - wellness
+    - fitness
+    - nutrition
+  # Any of these words or phrases in the headline drops it (whole-word match).
+  title_words:
+    - opinion
+    - guest essay
+    - op-ed
+    - letters to the editor
+    - recipe
+    - recipes
+    - workout
+    - workouts
+    - exercises
+    - stretches
+    - stretching
+    - longevity
+    - healthy aging
+    - as you age
+    - live longer
+    - dietitian
+    - nutritionist
+    - "sleep better"
+
+# How long stories stay on the page.
+retention_hours: 72
+
+# Stories whose text similarity is at or above this get merged into one card.
+# Raise it if unrelated stories are being merged; lower it if duplicates slip through.
+similarity_threshold: 0.62
+
+# Stories published further apart than this are never merged.
+merge_window_hours: 48
