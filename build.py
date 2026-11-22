@@ -279,7 +279,7 @@ class Selector:
 
 
 # Signals worth showing as a small label on the card.
-VISIBLE_SIGNALS = ("NYT front page", "WaPo The 7", "Scoop", "Feature")
+VISIBLE_SIGNALS = ("NYT front page", "WaPo The 7", "Scoop", "Feature", "Claude pick")
 
 
 # ---------------------------------------------------------------- similarity
@@ -328,8 +328,14 @@ def tfidf(texts: list[str]) -> np.ndarray:
     return mat
 
 
-def cluster(items: list[dict], threshold: float, window_h: float, lex_weight: float = 0.3) -> list[list[int]]:
+def cluster(items: list[dict], threshold: float, window_h: float, lex_weight: float = 0.3,
+            forced: dict | None = None) -> tuple[list[list[int]], list[tuple[int, int, float]]]:
     """Average-linkage clustering, restricted to a time window.
+
+    `forced` maps (id_a, id_b) (sorted) to "same" or "different": verdicts from
+    the Claude review that override the similarity score for that pair.
+    Returns (groups, borderline): borderline lists cross-outlet pairs scoring
+    within 0.1 of the threshold that have no verdict yet, for the next review.
 
     Similarity = sentence-embedding cosine + lex_weight * TF-IDF cosine. The
     embedding catches paraphrases ("Fed holds rates" / "Federal Reserve leaves
@@ -338,9 +344,9 @@ def cluster(items: list[dict], threshold: float, window_h: float, lex_weight: fl
     """
     n = len(items)
     if n == 0:
-        return []
+        return [], []
     if n == 1:
-        return [[0]]
+        return [[0]], []
     from scipy.cluster.hierarchy import fcluster, linkage
     from scipy.spatial.distance import squareform
 
@@ -359,6 +365,17 @@ def cluster(items: list[dict], threshold: float, window_h: float, lex_weight: fl
     same = outlets[:, None] == outlets[None, :]
     sim[same & (emb < 0.9)] = 0.0
     top = 1.0 + lex_weight
+    decided = np.zeros_like(sim, dtype=bool)
+    if forced:
+        index = {it["id"]: k for k, it in enumerate(items)}
+        for (a, b), verdict in forced.items():
+            if a in index and b in index:
+                i, j = index[a], index[b]
+                sim[i, j] = sim[j, i] = top if verdict == "same" else 0.0
+                decided[i, j] = decided[j, i] = True
+    iu = np.triu_indices(n, 1)
+    band = ((np.abs(sim[iu] - threshold) < 0.1) & (outlets[iu[0]] != outlets[iu[1]]) & ~decided[iu])
+    borderline = [(int(i), int(j), float(v)) for i, j, v in zip(iu[0][band], iu[1][band], sim[iu][band])]
     np.fill_diagonal(sim, top)
     dist = np.clip(top - sim, 0.0, 3.0)
     dist = (dist + dist.T) / 2
@@ -374,7 +391,7 @@ def cluster(items: list[dict], threshold: float, window_h: float, lex_weight: fl
     groups: dict[int, list[int]] = {}
     for i, lab in enumerate(labels):
         groups.setdefault(int(lab), []).append(i)
-    return list(groups.values())
+    return list(groups.values()), borderline
 
 
 def _dump(items, vecs):
@@ -447,6 +464,7 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
         s.setdefault("priority", i)
     reason = make_filter(cfg.get("filters", {}))
     selector = Selector(cfg, sources)
+    review = load_review(ROOT / "review" / "decisions.json")
     always_drop = [re.compile(p, re.I) for p in cfg.get("always_drop_titles", [])]
     now = time.time()
     default_ret = cfg.get("retention_hours", 72)
@@ -546,13 +564,15 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     for it in all_items:
         why = selector.held_reason(it, src_by_name[it["source"]])
         if why:
-            held.append(_card([it], it["section"], now) | {"reason": why})
+            held.append(_card([it], it["section"], now) | {"reason": why, "gated": True})
         else:
             items.append(it)
     log(f"{len(all_items)} stories in the window; {len(held)} held back as rumor/clickbait")
 
-    groups = cluster(items, cfg.get("similarity_threshold", 0.70), cfg.get("merge_window_hours", 48),
-                     cfg.get("lexical_weight", 0.3))
+    threshold = cfg.get("similarity_threshold", 0.70)
+    forced = {tuple(sorted(k.split("|"))): v["verdict"] for k, v in review["pairs"].items()}
+    groups, borderline = cluster(items, threshold, cfg.get("merge_window_hours", 48),
+                                 cfg.get("lexical_weight", 0.3), forced)
     section_order = [s["id"] for s in cfg["sections"]]
     clusters = []
     single_outlet_held = 0
@@ -563,14 +583,18 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
         section = min(sec_counts, key=lambda s: (-sec_counts[s], section_order.index(s) if s in section_order else 99))
         card = _card(members, section, now)
         signals = [selector.pass_signal(m, src_by_name[m["source"]]) for m in members]
+        # "gated" = only rule-gated sources, none by an allowed byline: open to Claude review.
+        card["gated"] = all(src_by_name[m["source"]].get("gate") for m in members) and "byline" not in signals
         if card["outlets"] >= 2 or any(signals):
             card["signal"] = next((s for s in signals if s in VISIBLE_SIGNALS), "")
             clusters.append(card)
         else:
             held.append(card | {"reason": "one outlet, no importance signal"})
             single_outlet_held += 1
+    clusters, held = apply_review(clusters, held, review)
     clusters.sort(key=lambda c: -c["time"])
     held.sort(key=lambda c: -c["time"])
+    emit_review_data(clusters, held, borderline, items, review, threshold, now)
     multi = sum(1 for c in clusters if len(c["links"]) > 1)
     log(f"{len(clusters)} cards ({multi} with coverage from more than one link), similarity via {getattr(embed, 'method', 'n/a')}")
     log(f"{len(held)} held back ({single_outlet_held} single-outlet stories without an importance signal)")
@@ -601,6 +625,84 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     (out_dir / "items.json").write_text(json.dumps({"generated": now, "items": all_items}, ensure_ascii=False))
     (out_dir / ".nojekyll").write_text("")
     log(f"Wrote {out_dir / 'index.html'}")
+
+
+# ---------------------------------------------------------------- Claude review
+#
+# A scheduled Claude session (see REVIEW.md) reads the stories this build was
+# unsure about from the build log (the REVIEWDATA line), and records verdicts in
+# review/decisions.json, which the next build applies here.
+
+def load_review(path: Path) -> dict:
+    empty = {"reviewed": {}, "promote": {}, "demote": {}, "pairs": {}}
+    try:
+        data = json.loads(path.read_text())
+        return {k: data.get(k, {}) for k in empty}
+    except FileNotFoundError:
+        return empty
+    except Exception as ex:  # noqa: BLE001
+        log(f"!! could not read {path}: {ex}")
+        return empty
+
+
+def apply_review(clusters: list[dict], held: list[dict], review: dict) -> tuple[list[dict], list[dict]]:
+    """Promote held stories Claude judged important; demote shown ones it judged minor."""
+    promote, demote = review["promote"], review["demote"]
+    out_clusters, out_held = [], []
+    promoted = demoted = 0
+    for c in held:
+        if any(l["id"] in promote for l in c["links"]):
+            out_clusters.append({k: v for k, v in c.items() if k != "reason"} | {"signal": "Claude pick"})
+            promoted += 1
+        else:
+            out_held.append(c)
+    for c in clusters:
+        hit = next((l["id"] for l in c["links"] if l["id"] in demote), None)
+        if hit and c.get("gated"):  # never demote sources you chose without a gate
+            out_held.append(c | {"reason": f"Claude review: {demote[hit].get('why', 'minor')}"})
+            demoted += 1
+        else:
+            out_clusters.append(c)
+    log(f"   review applied: {promoted} promoted, {demoted} demoted, {len(review['pairs'])} pair verdicts")
+    return out_clusters, out_held
+
+
+def emit_review_data(clusters, held, borderline, items, review, threshold, now) -> None:
+    """Print one compressed REVIEWDATA line listing what the reviewer hasn't seen yet."""
+    import base64
+    import gzip
+
+    seen = review["reviewed"]
+
+    def fresh(c):
+        return c.get("gated") and not all(l["id"] in seen for l in c["links"])
+
+    def brief(c):
+        return {
+            "ids": [l["id"] for l in c["links"]],
+            "title": c["title"],
+            "summary": c["summary"][:240],
+            "outlets": sorted({l["outlet"] for l in c["links"]}),
+            "section": c["section"],
+            "age_hours": round((now - c["time"]) / 3600, 1),
+        }
+
+    data = {
+        "generated": now,
+        "held": [brief(c) | {"reason": c.get("reason", "")} for c in held if fresh(c)],
+        "shown": [brief(c) | {"signal": c.get("signal", "")} for c in clusters if fresh(c)],
+        "pairs": [
+            {
+                "a": items[i]["id"], "a_outlet": items[i]["outlet"], "a_title": items[i]["title"],
+                "b": items[j]["id"], "b_outlet": items[j]["outlet"], "b_title": items[j]["title"],
+                "score": round(v, 3), "currently_merged": v >= threshold,
+            }
+            for i, j, v in borderline
+        ],
+    }
+    log(f"   for review: {len(data['held'])} held, {len(data['shown'])} shown, {len(data['pairs'])} borderline pairs")
+    blob = base64.b64encode(gzip.compress(json.dumps(data, ensure_ascii=False).encode())).decode()
+    print("REVIEWDATA:" + blob, flush=True)
 
 
 def _card(members: list[dict], section: str, now: float) -> dict:
