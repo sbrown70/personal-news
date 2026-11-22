@@ -11,6 +11,10 @@ on:
         description: "Dump stories + similarity vectors to the log"
         type: boolean
         default: false
+      models:
+        description: "Extra embedding models to dump (comma-separated)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -33,10 +37,11 @@ jobs:
         if: inputs.dump
         with:
           path: .cache/fastembed
-          key: fastembed-all-MiniLM-L6-v2-v1
+          key: fastembed-debug-${{ inputs.models }}
       - name: Build with data dump
         if: inputs.dump
         env:
           PREVIOUS_STATE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/items.json
           NEWS_DUMP: "1"
+          NEWS_DUMP_MODELS: ${{ inputs.models }}
         run: python build.py

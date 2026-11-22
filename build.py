@@ -290,7 +290,20 @@ def _dump(items, vecs):
         "items": [{k: it[k] for k in ("title", "summary", "outlet", "section", "time")} for it in items],
         "vecs": base64.b64encode(vecs.astype(np.float16).tobytes()).decode(),
         "dim": int(vecs.shape[1]),
+        "variants": {},
     }
+    # Optional: extra models to compare, e.g. NEWS_DUMP_MODELS="BAAI/bge-small-en-v1.5,BAAI/bge-base-en-v1.5"
+    from fastembed import TextEmbedding
+
+    cache = os.environ.get("FASTEMBED_CACHE_PATH", str(ROOT / ".cache" / "fastembed"))
+    for name in filter(None, os.environ.get("NEWS_DUMP_MODELS", "").split(",")):
+        model = TextEmbedding(name, cache_dir=cache)
+        for kind, texts in (("title", [it["title"] for it in items]),
+                            ("full", [f"{it['title']}. {it['summary'][:300]}" for it in items])):
+            v = np.array(list(model.embed(texts, batch_size=64)), dtype=np.float32)
+            v /= np.maximum(np.linalg.norm(v, axis=1, keepdims=True), 1e-9)
+            blob["variants"][f"{name}|{kind}"] = {"dim": int(v.shape[1]), "vecs": base64.b64encode(v.astype(np.float16).tobytes()).decode()}
+            log(f"   dumped {name} {kind}")
     print("NEWSDUMP:" + base64.b64encode(gzip.compress(json.dumps(blob).encode())).decode(), flush=True)
 
 
