@@ -1,0 +1,9 @@
+{
+  "_about": "Your corrections to the Claude review. 'keep': story ids to show even if Claude demoted them or the rules held them back. 'hide': story ids to keep off the page. The value is a short note; the reviewer reads these to learn your taste. Story ids are on each card's links in the page data, or ask Claude Code to add one.",
+  "keep": {
+    "c3af9b2361f3": "Bigfoot: fun enough, covered by two outlets",
+    "da3a8a64865a": "Fiona the hippo: fun enough, covered by two outlets",
+    "d22f94ab3689": "Bird migration record: fun, picked for WaPo's The 7"
+  },
+  "hide": {}
+}

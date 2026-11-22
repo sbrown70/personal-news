@@ -171,12 +171,15 @@ function topClusters() {
 function clustersFor(tab) {
   if (tab === "top") return topClusters();
   if (tab === "held") return DATA.held;
+  if (tab === "promoted") return [...DATA.clusters, ...DATA.held].filter(c => ["promoted", "hidden by you"].includes(c.review)).sort((a, b) => b.time - a.time);
+  if (tab === "demoted") return [...DATA.clusters, ...DATA.held].filter(c => ["demoted", "kept by you"].includes(c.review)).sort((a, b) => b.time - a.time);
   if (tab === "all") return DATA.clusters;
   return DATA.clusters.filter(c => c.section === tab);
 }
 
 function renderTabs() {
   const tabs = [{ id: "top", label: "Top Stories" }, { id: "all", label: "Everything" }, ...DATA.sections,
+    { id: "promoted", label: "Promoted" }, { id: "demoted", label: "Demoted" },
     { id: "held", label: "Held back" }, { id: "status", label: "Feeds" }];
   const el = document.getElementById("tabs");
   el.innerHTML = tabs.map(t => {
@@ -190,6 +193,15 @@ function renderTabs() {
     }
     return `<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${state.tab === t.id}">${esc(t.label)}${n}</button>`;
   }).join("");
+}
+
+// Why a card is where it is. Review details only show on the review tabs.
+function reasonText(c) {
+  if (["promoted", "demoted"].includes(state.tab) && c.review) {
+    const who = c.review.endsWith("by you") ? c.review[0].toUpperCase() + c.review.slice(1) : "Claude " + c.review;
+    return `${who}: ${c.review_why || ""} · id ${c.links[0].id}`;
+  }
+  return c.reason || "";
 }
 
 function card(c) {
@@ -210,7 +222,7 @@ function card(c) {
     ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ""}
     <div class="meta">${isNew(c) ? '<span class="badge">New</span>' : ""}${c.signal ? `<span class="sig">${esc(c.signal)}</span>` : ""}${chips}
       ${c.links.length > 1 ? `<span class="multi">${c.outlets} outlet${c.outlets > 1 ? "s" : ""}</span>` : ""}
-      ${c.reason ? `<span class="reason">${esc(c.reason)}</span>` : ""}
+      ${reasonText(c) ? `<span class="reason">${esc(reasonText(c))}</span>` : ""}
       <span class="when">${rel(c.time)}</span>
     </div>
   </article>`;
@@ -223,9 +235,12 @@ function renderList() {
     const q = state.q.toLowerCase();
     list = list.filter(c => c.links.some(l => l.title.toLowerCase().includes(q) || l.outlet.toLowerCase().includes(q)) || c.summary.toLowerCase().includes(q));
   }
-  const note = state.tab === "held"
-    ? `<p class="note">Stories kept off the main page: rumors and clickbait, and stories only one outlet covered that showed no sign of being important (not on NYT's front page or in WaPo's The 7, no scoop or feature language). Nothing here is counted in the other tabs.</p>`
-    : "";
+  const notes = {
+    held: "Stories kept off the main page: rumors and clickbait, and stories only one outlet covered that showed no sign of being important (not on NYT's front page or in WaPo's The 7, no scoop or feature language). Nothing here is counted in the other tabs.",
+    promoted: "Stories the Claude review moved onto the main page from Held back, with its reason. To reverse one, add its id under \"hide\" in review/overrides.json (or ask Claude Code to). Reversals show here as \"Hidden by you\", and the reviewer learns from them.",
+    demoted: "Stories the Claude review took off the main page, with its reason. To reverse one, add its id under \"keep\" in review/overrides.json (or ask Claude Code to). Reversals show here as \"Kept by you\", and the reviewer learns from them.",
+  };
+  const note = notes[state.tab] ? `<p class="note">${notes[state.tab]}</p>` : "";
   if (!list.length) return note + `<p class="empty">${state.hideRead ? "All caught up." : "Nothing here yet."}</p>`;
   if (state.tab === "top") return list.map(card).join("");
   let out = note, last = "";
@@ -290,7 +305,7 @@ document.getElementById("markAll").onclick = () => {
 document.getElementById("q").oninput = e => { state.q = e.target.value.trim(); document.getElementById("main").innerHTML = renderList(); };
 
 document.getElementById("updated").textContent = "Updated " + new Date(DATA.generated * 1000).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
-if (!["top", "all", "held", "status", ...DATA.sections.map(s => s.id)].includes(state.tab)) state.tab = "top";
+if (!["top", "all", "promoted", "demoted", "held", "status", ...DATA.sections.map(s => s.id)].includes(state.tab)) state.tab = "top";
 if (state.tab === "top" && !topClusters().length) state.tab = "all";
 render();
 </script>

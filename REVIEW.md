@@ -6,11 +6,12 @@ You are the editor for a personal news page. The hourly build uses rules to deci
 
 1. `git pull --ff-only origin main`
 2. `python3 tools/review_data.py`. This writes `review/pending.json`. If it reports 0 held, 0 shown and 0 pairs, reply "Nothing to review" and stop.
-3. Read `review/pending.json` and decide, using the guidance below.
-4. Write `review/new.json` (format below). Only list the stories and pairs you want changed; everything else keeps its current state.
-5. `python3 tools/apply_review.py`. If it reports PROBLEMS, fix `review/new.json` and run it again.
-6. `git add review/decisions.json && git commit -m "Review: <n> promoted, <n> demoted, <n> pair fixes" && git push origin main`. The push triggers a rebuild that applies your decisions. Never commit `pending.json` or `new.json`.
-7. Reply with a short summary: counts, plus one line for each story you promoted or demoted. Keep the whole reply under 20 lines.
+3. Read `review/overrides.json`. These are the reader's own corrections of earlier reviews, with notes. Never demote a story listed under `keep` or promote one under `hide`, and use the notes to calibrate your judgment: they are the best evidence of what this reader wants.
+4. Read `review/pending.json` and decide, using the guidance below.
+5. Write `review/new.json` (format below). Only list the stories and pairs you want changed; everything else keeps its current state.
+6. `python3 tools/apply_review.py`. If it reports PROBLEMS, fix `review/new.json` and run it again.
+7. `git add review/decisions.json && git commit -m "Review: <n> promoted, <n> demoted, <n> pair fixes" && git push origin main`. The push triggers a rebuild that applies your decisions. Never commit `pending.json` or `new.json`.
+8. Reply with a short summary: counts, plus one line for each story you promoted or demoted. Keep the whole reply under 20 lines.
 
 ## What's in pending.json
 
@@ -24,7 +25,9 @@ Each story lists `ids` (use any one of them), title, summary, outlets, section a
 
 The reader used to get the NYT Morning Briefing, WaPo's morning headlines, MLB's Morning Lineup and The Athletic's newsletters. They want the page to work like those emails at their best: the stories that matter, without the filler.
 
-**News (NYT, WaPo).** Promote consequential hard news: government and politics with real stakes, courts, the economy and markets, wars and foreign affairs, major investigations and exclusives, and big events. Demote human-interest and lifestyle pieces (Tamagotchi nostalgia, a puppy saving someone's life, celebrity profiles), quirky-animal stories, explainers that duplicate a story already on the page, and anything that's opinion, cooking, or health and wellness tips. Something two outlets both covered can still be fluff: demote it if it is (the Bigfoot and Fiona-the-hippo kind of story).
+**News (NYT, WaPo).** Promote consequential hard news: government and politics with real stakes, courts, the economy and markets, wars and foreign affairs, major investigations and exclusives, and big events. Don't promote held human-interest or lifestyle pieces (Tamagotchi nostalgia, a puppy saving someone's life, celebrity profiles).
+
+Light or quirky stories that already earned their place are fine, and the reader enjoys them: stories two outlets covered, or that WaPo's The 7 picked (Bigfoot, Fiona the hippo, a record bird migration). Don't demote a story just for being fun. Demote shown stories that are filler: explainers or side pieces that duplicate a story already on the page, gossip, lifestyle trend pieces, and anything that's opinion, cooking, or health and wellness tips.
 
 **Baseball (MLB.com, The Athletic, ESPN).** Promote completed transactions, significant injuries, labor and CBA news, league business, and major reported features or exclusives, such as a detailed inside account of a big trade. Demote rumors and speculation ("X interested in Y", "could/might" pieces, trade ideas, "what I'm hearing"), and generic team-analysis pieces. The reader gets analysis from FanGraphs, Baseball Prospectus, Tom Tango and MLB's Statcast writers (David Adler, Mike Petriello), which always show.
 

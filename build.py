@@ -279,7 +279,7 @@ class Selector:
 
 
 # Signals worth showing as a small label on the card.
-VISIBLE_SIGNALS = ("NYT front page", "WaPo The 7", "Scoop", "Feature", "Claude pick")
+VISIBLE_SIGNALS = ("NYT front page", "WaPo The 7", "Scoop", "Feature", "Claude pick", "Your pick")
 
 
 # ---------------------------------------------------------------- similarity
@@ -634,36 +634,68 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
 # review/decisions.json, which the next build applies here.
 
 def load_review(path: Path) -> dict:
+    """Claude's verdicts (decisions.json) plus the reader's corrections (overrides.json)."""
     empty = {"reviewed": {}, "promote": {}, "demote": {}, "pairs": {}}
+    out = dict(empty)
     try:
         data = json.loads(path.read_text())
-        return {k: data.get(k, {}) for k in empty}
+        out = {k: data.get(k, {}) for k in empty}
     except FileNotFoundError:
-        return empty
+        pass
     except Exception as ex:  # noqa: BLE001
         log(f"!! could not read {path}: {ex}")
-        return empty
+    try:
+        ov = json.loads((path.parent / "overrides.json").read_text())
+    except FileNotFoundError:
+        ov = {}
+    except Exception as ex:  # noqa: BLE001
+        log(f"!! could not read overrides.json: {ex}")
+        ov = {}
+    out["keep"] = ov.get("keep", {})
+    out["hide"] = ov.get("hide", {})
+    return out
 
 
 def apply_review(clusters: list[dict], held: list[dict], review: dict) -> tuple[list[dict], list[dict]]:
-    """Promote held stories Claude judged important; demote shown ones it judged minor."""
-    promote, demote = review["promote"], review["demote"]
+    """Apply Claude's promotions and demotions, then the reader's overrides on top.
+
+    Cards get a `review` field ("promoted", "demoted", "kept by you", "hidden by
+    you") and `review_why`, which the Promoted / Demoted tabs show.
+    """
+    promote, demote, keep, hide = review["promote"], review["demote"], review["keep"], review["hide"]
+
+    def first(c, table):
+        return next((l["id"] for l in c["links"] if l["id"] in table), None)
+
     out_clusters, out_held = [], []
-    promoted = demoted = 0
+    counts = Counter()
     for c in held:
-        if any(l["id"] in promote for l in c["links"]):
-            out_clusters.append({k: v for k, v in c.items() if k != "reason"} | {"signal": "Claude pick"})
-            promoted += 1
+        k, h, p = first(c, keep), first(c, hide), first(c, promote)
+        base = {key: v for key, v in c.items() if key != "reason"}
+        if k:
+            out_clusters.append(base | {"signal": "Your pick", "review": "kept by you", "review_why": keep[k]})
+            counts["kept"] += 1
+        elif p and not h:
+            out_clusters.append(base | {"signal": "Claude pick", "review": "promoted", "review_why": promote[p].get("why", "")})
+            counts["promoted"] += 1
         else:
             out_held.append(c)
     for c in clusters:
-        hit = next((l["id"] for l in c["links"] if l["id"] in demote), None)
-        if hit and c.get("gated"):  # never demote sources you chose without a gate
-            out_held.append(c | {"reason": f"Claude review: {demote[hit].get('why', 'minor')}"})
-            demoted += 1
+        k, h, d = first(c, keep), first(c, hide), first(c, demote)
+        if h:
+            out_held.append(c | {"reason": f"Hidden by you: {hide[h]}", "review": "hidden by you", "review_why": hide[h]})
+            counts["hidden"] += 1
+        elif d and c.get("gated") and not k:  # never demote sources you chose without a gate
+            why = demote[d].get("why", "minor")
+            out_held.append(c | {"reason": f"Claude review: {why}", "review": "demoted", "review_why": why})
+            counts["demoted"] += 1
+        elif d and k:
+            out_clusters.append(c | {"review": "kept by you", "review_why": keep[k]})
+            counts["kept"] += 1
         else:
             out_clusters.append(c)
-    log(f"   review applied: {promoted} promoted, {demoted} demoted, {len(review['pairs'])} pair verdicts")
+    log(f"   review applied: {counts['promoted']} promoted, {counts['demoted']} demoted, "
+        f"{counts['kept']} kept by you, {counts['hidden']} hidden by you, {len(review['pairs'])} pair verdicts")
     return out_clusters, out_held
 
 
