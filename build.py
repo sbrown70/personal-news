@@ -270,6 +270,8 @@ def cluster(items: list[dict], threshold: float, window_h: float) -> list[list[i
 
     if os.environ.get("NEWS_DEBUG"):
         _debug_pairs(items, sim, outlets, threshold)
+    if os.environ.get("NEWS_DUMP"):
+        _dump(items, vecs)
 
     z = linkage(squareform(dist, checks=False), method="average")
     labels = fcluster(z, t=1.0 - threshold, criterion="distance")
@@ -277,6 +279,19 @@ def cluster(items: list[dict], threshold: float, window_h: float) -> list[list[i
     for i, lab in enumerate(labels):
         groups.setdefault(int(lab), []).append(i)
     return list(groups.values())
+
+
+def _dump(items, vecs):
+    """Print stories and their vectors as one compressed line, for tuning offline."""
+    import base64
+    import gzip
+
+    blob = {
+        "items": [{k: it[k] for k in ("title", "summary", "outlet", "section", "time")} for it in items],
+        "vecs": base64.b64encode(vecs.astype(np.float16).tobytes()).decode(),
+        "dim": int(vecs.shape[1]),
+    }
+    print("NEWSDUMP:" + base64.b64encode(gzip.compress(json.dumps(blob).encode())).decode(), flush=True)
 
 
 def _debug_pairs(items, sim, outlets, threshold):
