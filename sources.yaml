@@ -97,9 +97,10 @@ sources:
   - name: ESPN MLB
     outlet: ESPN
     section: baseball
-    # ESPN's own feed (espn.com/espn/rss/mlb/news) blocks GitHub's servers.
+    # ESPN's own MLB feed (espn.com/espn/rss/mlb/news, also sports-ak.espn.go.com) blocks
+    # GitHub's servers, so this is the same MLB stories via Google News.
     google_news: true
-    urls: ["https://news.google.com/rss/search?q=site:espn.com/mlb+when:3d&hl=en-US&gl=US&ceid=US:en"]
+    urls: ["https://news.google.com/rss/search?q=site:espn.com/mlb/story+when:3d&hl=en-US&gl=US&ceid=US:en"]
 
   - name: FanGraphs
     outlet: FanGraphs
