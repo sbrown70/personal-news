@@ -77,16 +77,6 @@ sources:
     filter: true
     urls: [https://feeds.washingtonpost.com/rss/business]
 
-  - name: Econvitals (Jason Furman)
-    outlet: Econvitals
-    section: misc
-    urls:
-      - https://econvitals.org/feed
-      - https://econvitals.org/rss.xml
-      - https://econvitals.org/feed.xml
-      - https://econvitals.org/index.xml
-    site: https://econvitals.org/
-
   - name: MLB.com News (replaces MLB Morning Lineup)
     outlet: MLB.com
     section: baseball

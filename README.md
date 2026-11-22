@@ -24,7 +24,7 @@ Read state is kept in your browser's local storage, so it is per device.
 
 ## Where the newsletters went
 
-The daily emails aren't public, so each one is replaced by the public feed that carries the same stories:
+The daily emails aren't public, so each one is replaced by the public feed that carries the same stories. (Jason Furman's Econvitals is left out on purpose: it's a standalone dashboard, best read on its own at econvitals.org.)
 
 | Email | Replaced by |
 |---|---|
@@ -32,7 +32,6 @@ The daily emails aren't public, so each one is replaced by the public feed that 
 | WaPo morning headlines | WaPo National, Politics, World and Business feeds (filtered) |
 | MLB Morning Lineup | MLB.com news feed |
 | The Athletic Pulse / Daily / Weekly | The Athletic MLB feed |
-| Econvitals (Jason Furman) | Econvitals site feed (auto-discovered) |
 
 ## Changing things
 
@@ -40,7 +39,7 @@ Everything is in `sources.yaml`:
 
 - **Add a feed**: copy one of the entries. To bring over everything from Feedly, export OPML (Feedly → Organize → ⋯ → Export OPML) and add the `xmlUrl` values.
 - **Filters**: edit `filters`. They only apply to sources marked `filter: true`.
-- **Too much or too little merging**: change `similarity_threshold` (default 0.62). Raise it if unrelated stories get merged; lower it if duplicates slip through. Each Actions run logs the story pairs near the threshold so you can see what it's deciding.
+- **Too much or too little merging**: change `similarity_threshold` (default 0.70). Raise it if unrelated stories get merged; lower it if duplicates slip through. Each Actions run logs the story pairs near the threshold so you can see what it's deciding.
 
 Push to `main` and the page rebuilds. You can also run it by hand: Actions → Build news page → Run workflow.
 
