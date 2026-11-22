@@ -84,6 +84,9 @@ nav.tabs::-webkit-scrollbar { display: none; }
 .when { color: var(--muted); margin-left: auto; white-space: nowrap; }
 .badge { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--new); }
 .multi { font-size: 12px; color: var(--muted); }
+.sig { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--accent); }
+.reason { font-size: 12px; color: var(--muted); font-style: italic; }
+.note { color: var(--muted); font-size: 13.5px; margin: 14px 0 4px; }
 .empty { text-align: center; color: var(--muted); padding: 48px 0; }
 .status-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px; }
 .status-table th, .status-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -158,20 +161,23 @@ function dayLabel(t) {
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-// Top stories: covered by 2+ outlets in the last 36 hours, biggest first.
+// Top stories, last 36 hours: covered by 2+ outlets, or flagged by an importance
+// signal (NYT front page, WaPo's The 7, scoop, feature). Biggest first.
 function topClusters() {
   return DATA.clusters
-    .filter(c => c.outlets >= 2 && now - c.time < 36 * 3600)
+    .filter(c => (c.outlets >= 2 || c.signal) && now - c.time < 36 * 3600)
     .sort((a, b) => (b.outlets - a.outlets) || (b.time - a.time));
 }
 function clustersFor(tab) {
   if (tab === "top") return topClusters();
+  if (tab === "held") return DATA.held;
   if (tab === "all") return DATA.clusters;
   return DATA.clusters.filter(c => c.section === tab);
 }
 
 function renderTabs() {
-  const tabs = [{ id: "top", label: "Top Stories" }, { id: "all", label: "Everything" }, ...DATA.sections, { id: "status", label: "Feeds" }];
+  const tabs = [{ id: "top", label: "Top Stories" }, { id: "all", label: "Everything" }, ...DATA.sections,
+    { id: "held", label: "Held back" }, { id: "status", label: "Feeds" }];
   const el = document.getElementById("tabs");
   el.innerHTML = tabs.map(t => {
     let n = "";
@@ -202,8 +208,9 @@ function card(c) {
       </button>
     </div>
     ${c.summary ? `<p class="summary">${esc(c.summary)}</p>` : ""}
-    <div class="meta">${isNew(c) ? '<span class="badge">New</span>' : ""}${chips}
+    <div class="meta">${isNew(c) ? '<span class="badge">New</span>' : ""}${c.signal ? `<span class="sig">${esc(c.signal)}</span>` : ""}${chips}
       ${c.links.length > 1 ? `<span class="multi">${c.outlets} outlet${c.outlets > 1 ? "s" : ""}</span>` : ""}
+      ${c.reason ? `<span class="reason">${esc(c.reason)}</span>` : ""}
       <span class="when">${rel(c.time)}</span>
     </div>
   </article>`;
@@ -216,9 +223,12 @@ function renderList() {
     const q = state.q.toLowerCase();
     list = list.filter(c => c.links.some(l => l.title.toLowerCase().includes(q) || l.outlet.toLowerCase().includes(q)) || c.summary.toLowerCase().includes(q));
   }
-  if (!list.length) return `<p class="empty">${state.hideRead ? "All caught up." : "Nothing here yet."}</p>`;
+  const note = state.tab === "held"
+    ? `<p class="note">Stories kept off the main page: rumors and clickbait, and stories only one outlet covered that showed no sign of being important (not on NYT's front page or in WaPo's The 7, no scoop or feature language). Nothing here is counted in the other tabs.</p>`
+    : "";
+  if (!list.length) return note + `<p class="empty">${state.hideRead ? "All caught up." : "Nothing here yet."}</p>`;
   if (state.tab === "top") return list.map(card).join("");
-  let out = "", last = "";
+  let out = note, last = "";
   for (const c of list) {
     const d = dayLabel(c.time);
     if (d !== last) { out += `<div class="day">${d}</div>`; last = d; }
@@ -252,7 +262,7 @@ function markRead(ids, value) {
   for (const id of ids) { if (value) read[id] = t; else delete read[id]; }
   store.set("read", read);
 }
-const byId = id => DATA.clusters.find(c => c.id === id);
+const byId = id => DATA.clusters.find(c => c.id === id) || DATA.held.find(c => c.id === id);
 
 document.addEventListener("click", e => {
   const tab = e.target.closest("[data-tab]");
@@ -280,7 +290,7 @@ document.getElementById("markAll").onclick = () => {
 document.getElementById("q").oninput = e => { state.q = e.target.value.trim(); document.getElementById("main").innerHTML = renderList(); };
 
 document.getElementById("updated").textContent = "Updated " + new Date(DATA.generated * 1000).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
-if (!["top", "all", "status", ...DATA.sections.map(s => s.id)].includes(state.tab)) state.tab = "top";
+if (!["top", "all", "held", "status", ...DATA.sections.map(s => s.id)].includes(state.tab)) state.tab = "top";
 if (state.tab === "top" && !topClusters().length) state.tab = "all";
 render();
 </script>

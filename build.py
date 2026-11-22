@@ -154,7 +154,7 @@ def fetch_source(src: dict) -> dict:
         return {"ok": False, "url": None, "entries": [], "errors": errors}
 
     entries = []
-    for e in feed.entries:
+    for rank, e in enumerate(feed.entries):
         link = e.get("link") or ""
         title = strip_html(e.get("title", ""))
         if not link or not title:
@@ -174,6 +174,8 @@ def fetch_source(src: dict) -> dict:
             "summary": truncate(summary, 400),
             "published": entry_time(e),
             "tags": tags,
+            "author": e.get("author", "") or "",
+            "rank": rank,  # position in the feed; on NYT's home-page feed this is editors' placement
         })
     return {"ok": True, "url": used, "entries": entries, "errors": errors}
 
@@ -201,6 +203,83 @@ def make_filter(rules: dict):
         return None
 
     return reason
+
+
+# ---------------------------------------------------------------- selection
+
+def _rx(patterns) -> list[re.Pattern]:
+    return [re.compile(p, re.I) for p in patterns or []]
+
+
+class Selector:
+    """Decides which stories reach the main page.
+
+    Two steps:
+      1. held_reason(): per-story drops for rumor and clickbait headlines on the
+         sources that opt in (rumor_rules, drop_titles, drop_question_headlines).
+      2. pass_signal(): for sources marked `gate: true`, a single-outlet story is
+         shown only if it carries an importance signal: an allow-listed byline,
+         NYT front-page placement, an editors'-pick URL (WaPo's The 7), scoop or
+         feature language, or a source-specific keyword. Stories covered by two or
+         more outlets always pass (that check happens per card, in build()).
+    Anything that fails goes to the "Held back" tab instead of disappearing.
+    """
+
+    def __init__(self, cfg: dict, sources: list[dict]):
+        sel = cfg.get("selection", {})
+        self.rumor = _rx(sel.get("rumor_patterns"))
+        self.scoop = _rx(sel.get("scoop_patterns"))
+        self.feature = _rx(sel.get("feature_patterns"))
+        self.picks = {k.lower(): v for k, v in (sel.get("editor_pick_urls") or {}).items()}
+        for src in sources:
+            src["_drop"] = _rx(src.get("drop_titles"))
+            src["_keywords"] = _rx(src.get("pass_keywords"))
+            src["_authors"] = [a.lower() for a in src.get("pass_authors", [])]
+
+    @staticmethod
+    def author_ok(it: dict, src: dict) -> bool:
+        a = (it.get("author") or "").lower()
+        return bool(a) and any(name in a for name in src["_authors"])
+
+    def held_reason(self, it: dict, src: dict) -> str | None:
+        if self.author_ok(it, src):
+            return None
+        title = it["title"]
+        if src.get("rumor_rules"):
+            for p in self.rumor:
+                if p.search(title):
+                    return "rumor/speculation"
+        for p in src["_drop"]:
+            if p.search(title):
+                return "clickbait/marketing"
+        if src.get("drop_question_headlines") and title.rstrip().endswith("?"):
+            return "question headline"
+        return None
+
+    def pass_signal(self, it: dict, src: dict) -> str | None:
+        """Return why this story may show on its own, or None."""
+        if not src.get("gate"):
+            return "source"
+        if self.author_ok(it, src):
+            return "byline"
+        if it.get("front_page"):
+            return "NYT front page"
+        url = it["url"].lower()
+        for frag, label in self.picks.items():
+            if frag in url:
+                return label
+        text = f"{it['title']} {it.get('summary', '')}"
+        if any(p.search(text) for p in self.scoop):
+            return "Scoop"
+        if any(p.search(text) for p in self.feature):
+            return "Feature"
+        if any(p.search(it["title"]) for p in src["_keywords"]):
+            return "keyword"
+        return None
+
+
+# Signals worth showing as a small label on the card.
+VISIBLE_SIGNALS = ("NYT front page", "WaPo The 7", "Scoop", "Feature")
 
 
 # ---------------------------------------------------------------- similarity
@@ -367,6 +446,7 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     for i, s in enumerate(sources):
         s.setdefault("priority", i)
     reason = make_filter(cfg.get("filters", {}))
+    selector = Selector(cfg, sources)
     always_drop = [re.compile(p, re.I) for p in cfg.get("always_drop_titles", [])]
     now = time.time()
     default_ret = cfg.get("retention_hours", 72)
@@ -406,8 +486,10 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
                 t = now
             if expired(src, t):
                 continue
+            front = e["rank"] < src.get("front_page_positions", 0)
             existing = fresh.get(iid)
             if existing and existing["priority"] <= src["priority"]:
+                existing["front_page"] = existing.get("front_page") or front
                 continue
             fresh[iid] = {
                 "id": iid,
@@ -419,6 +501,8 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
                 "section": src["section"],
                 "priority": src["priority"],
                 "time": t,
+                "author": e["author"],
+                "front_page": front or bool(existing and existing.get("front_page")),
             }
             kept += 1
         status.append({
@@ -452,53 +536,83 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     for iid, it in fresh.items():
         prev = merged.get(iid)
         it["first_seen"] = prev.get("first_seen", now) if prev else now
+        # Once a story has been on NYT's front page, remember it.
+        it["front_page"] = it.get("front_page") or bool(prev and prev.get("front_page"))
         merged[iid] = it
-    items = sorted(merged.values(), key=lambda x: -x["time"])
-    log(f"{len(items)} stories on the page")
+    all_items = sorted(merged.values(), key=lambda x: -x["time"])
+
+    held: list[dict] = []
+    items = []
+    for it in all_items:
+        why = selector.held_reason(it, src_by_name[it["source"]])
+        if why:
+            held.append(_card([it], it["section"], now) | {"reason": why})
+        else:
+            items.append(it)
+    log(f"{len(all_items)} stories in the window; {len(held)} held back as rumor/clickbait")
 
     groups = cluster(items, cfg.get("similarity_threshold", 0.70), cfg.get("merge_window_hours", 48),
                      cfg.get("lexical_weight", 0.3))
     section_order = [s["id"] for s in cfg["sections"]]
     clusters = []
+    single_outlet_held = 0
     for g in groups:
         members = sorted((items[i] for i in g), key=lambda x: (x["priority"], x["time"]))
-        lead = members[0]
         # The card goes in the section most of its links come from (ties: config order).
         sec_counts = Counter(m["section"] for m in members)
         section = min(sec_counts, key=lambda s: (-sec_counts[s], section_order.index(s) if s in section_order else 99))
-        summary = lead["summary"] or next((m["summary"] for m in members if m["summary"]), "")
-        clusters.append({
-            "id": lead["id"],
-            "title": lead["title"],
-            "summary": truncate(summary, 300),
-            "section": section,
-            "time": max(m["time"] for m in members),
-            "first_time": min(m["time"] for m in members),
-            "first_seen": min(m.get("first_seen", now) for m in members),
-            "outlets": len({m["outlet"] for m in members}),
-            "links": [
-                {"id": m["id"], "url": m["url"], "outlet": m["outlet"], "title": m["title"], "time": m["time"]}
-                for m in sorted(members, key=lambda x: (x["priority"], x["time"]))
-            ],
-        })
+        card = _card(members, section, now)
+        signals = [selector.pass_signal(m, src_by_name[m["source"]]) for m in members]
+        if card["outlets"] >= 2 or any(signals):
+            card["signal"] = next((s for s in signals if s in VISIBLE_SIGNALS), "")
+            clusters.append(card)
+        else:
+            held.append(card | {"reason": "one outlet, no importance signal"})
+            single_outlet_held += 1
     clusters.sort(key=lambda c: -c["time"])
+    held.sort(key=lambda c: -c["time"])
     multi = sum(1 for c in clusters if len(c["links"]) > 1)
     log(f"{len(clusters)} cards ({multi} with coverage from more than one link), similarity via {getattr(embed, 'method', 'n/a')}")
+    log(f"{len(held)} held back ({single_outlet_held} single-outlet stories without an importance signal)")
+    for c in clusters:
+        if c.get("signal"):
+            log(f"   passed via {c['signal']}: [{c['links'][0]['outlet']}] {c['title'][:90]}")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     page_data = {
         "generated": now,
         "sections": cfg["sections"],
         "clusters": clusters,
+        "held": held,
         "status": status,
         "filtered": filtered_log,
     }
     template = (ROOT / "templates" / "index.html").read_text()
     payload = json.dumps(page_data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     (out_dir / "index.html").write_text(template.replace("/*__DATA__*/null", payload))
-    (out_dir / "items.json").write_text(json.dumps({"generated": now, "items": items}, ensure_ascii=False))
+    (out_dir / "items.json").write_text(json.dumps({"generated": now, "items": all_items}, ensure_ascii=False))
     (out_dir / ".nojekyll").write_text("")
     log(f"Wrote {out_dir / 'index.html'}")
+
+
+def _card(members: list[dict], section: str, now: float) -> dict:
+    """One card on the page: a story and every outlet's link to it."""
+    lead = members[0]
+    summary = lead["summary"] or next((m["summary"] for m in members if m["summary"]), "")
+    return {
+        "id": lead["id"],
+        "title": lead["title"],
+        "summary": truncate(summary, 300),
+        "section": section,
+        "time": max(m["time"] for m in members),
+        "first_time": min(m["time"] for m in members),
+        "first_seen": min(m.get("first_seen", now) for m in members),
+        "outlets": len({m["outlet"] for m in members}),
+        "links": [
+            {"id": m["id"], "url": m["url"], "outlet": m["outlet"], "title": m["title"], "time": m["time"]}
+            for m in sorted(members, key=lambda x: (x["priority"], x["time"]))
+        ],
+    }
 
 
 def main():

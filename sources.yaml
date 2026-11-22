@@ -17,6 +17,19 @@
 #   google_news  true = the urls are Google News searches, used for sites that
 #             block automated feed readers. Links go through news.google.com,
 #             which forwards you to the article.
+#
+# Story selection (see `selection` at the bottom for the shared patterns):
+#   gate      true = a story that only this outlet covered is shown only if it has
+#             an importance signal (front-page placement, an editors'-pick URL,
+#             scoop/feature language, an allowed byline or keyword). Stories two or
+#             more outlets covered always show. Everything else goes to "Held back".
+#   front_page_positions  N = the first N items of this feed count as front-page
+#             (NYT's home-page feed is in editors' placement order).
+#   rumor_rules  true = drop rumor/speculation headlines (selection.rumor_patterns).
+#   drop_titles  regexes for headlines to hold back from this source (clickbait).
+#   drop_question_headlines  true = hold back headlines ending in "?".
+#   pass_authors  bylines that always show and skip the rumor rules.
+#   pass_keywords  regexes; a headline matching one passes the gate.
 
 sections:
   # retention_hours: how long stories stay. Slow-moving sections keep them longer
@@ -34,45 +47,54 @@ sources:
     outlet: NYT
     section: news
     filter: true
+    gate: true
+    front_page_positions: 6
     urls: [https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml]
 
   - name: NYT U.S.
+    gate: true
     outlet: NYT
     section: news
     filter: true
     urls: [https://rss.nytimes.com/services/xml/rss/nyt/US.xml]
 
   - name: NYT Politics
+    gate: true
     outlet: NYT
     section: news
     filter: true
     urls: [https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml]
 
   - name: NYT Business
+    gate: true
     outlet: NYT
     section: news
     filter: true
     urls: [https://rss.nytimes.com/services/xml/rss/nyt/Business.xml]
 
   - name: WaPo National (replaces the headlines email)
+    gate: true
     outlet: WaPo
     section: news
     filter: true
     urls: [https://feeds.washingtonpost.com/rss/national]
 
   - name: WaPo Politics
+    gate: true
     outlet: WaPo
     section: news
     filter: true
     urls: [https://feeds.washingtonpost.com/rss/politics]
 
   - name: WaPo World
+    gate: true
     outlet: WaPo
     section: news
     filter: true
     urls: [https://feeds.washingtonpost.com/rss/world]
 
   - name: WaPo Business
+    gate: true
     outlet: WaPo
     section: news
     filter: true
@@ -81,11 +103,31 @@ sources:
   - name: MLB.com News (replaces MLB Morning Lineup)
     outlet: MLB.com
     section: baseball
+    gate: true
+    rumor_rules: true
+    drop_question_headlines: true
+    pass_authors: [David Adler, Mike Petriello, Tom Tango]
     urls: [https://www.mlb.com/feeds/news/rss.xml]
+
+  # Listed before "The Athletic MLB" so these own any story that appears in both
+  # feeds, which means they skip that feed's rules.
+  - name: The Athletic - Eno Sarris
+    outlet: The Athletic
+    section: baseball
+    retention_hours: 336
+    urls: [https://www.nytimes.com/athletic/rss/author/eno-sarris/]
+
+  - name: The Athletic - Jesus Cano (Braves beat)
+    outlet: The Athletic
+    section: baseball
+    retention_hours: 168
+    urls: [https://www.nytimes.com/athletic/rss/author/jesus-cano/]
 
   - name: The Athletic MLB (replaces Athletic emails)
     outlet: The Athletic
     section: baseball
+    gate: true
+    rumor_rules: true
     urls: [https://www.nytimes.com/athletic/rss/mlb/]
 
   # ---------- From Feedly: Baseball ----------
@@ -101,6 +143,8 @@ sources:
     # ESPN's own MLB feed (espn.com/espn/rss/mlb/news, also sports-ak.espn.go.com) blocks
     # GitHub's servers, so this is the same MLB stories via Google News.
     google_news: true
+    gate: true
+    rumor_rules: true
     urls: ["https://news.google.com/rss/search?q=site:espn.com/mlb/story+when:3d&hl=en-US&gl=US&ceid=US:en"]
 
   - name: FanGraphs
@@ -141,6 +185,29 @@ sources:
   - name: GM Authority
     outlet: GM Authority
     section: cars
+    gate: true
+    drop_question_headlines: true
+    drop_titles:
+      - "^Poll:"
+      - "\\bDeals? For (January|February|March|April|May|June|July|August|September|October|November|December)\\b"
+      - "\\b(Discount|Lease|Financing)\\b"
+      - ":\\s*Video$"
+      - "Now Available (To|For) Order"
+      - "Here[’']s How Much"
+      - "May Shock You"
+      - "\\bWhich (One|Would)\\b"
+      - "\\b(Baojun|Wuling)\\b"
+      - "\\bIn (Argentina|Brazil|Peru|Chile|Colombia|Ecuador|Uruguay|Paraguay|Bolivia|Venezuela|Central America|Mexico|China|Korea|South Korea|Australia|Japan|the Middle East|South Africa|Uzbekistan|Europe)\\b"
+    # A GM Authority story only it covered still shows if the headline is about
+    # the company itself rather than a product or promotion.
+    pass_keywords:
+      - "\\b(stock|shares|earnings|profit|revenue|quarter(ly)?|Q[1-4]|guidance|dividend|buyback)\\b"
+      - "\\b(Barra|CEO|CFO|president|executive|board|leadership|succession)\\b"
+      - "\\b(recall|NHTSA|investigation|probe|lawsuit|sues|sued|settlement|fine[ds]?)\\b"
+      - "\\b(plant|factory|assembly|production|layoffs?|job cuts|workers|UAW|strike|union)\\b"
+      - "\\b(tariffs?|regulation|regulators?|EPA|emissions|Congress|federal|law|bill|provision|rule)\\b"
+      - "\\b(invest(s|ment|ing)?|billion|acquisition|partnership|Cruise|autonomous|battery plant)\\b"
+      - "\\b(sales (results|report|fell|rose|decline|increase|up|down)|market share)\\b"
     urls: [https://gmauthority.com/blog/feed/]
     site: https://gmauthority.com
 
@@ -193,6 +260,8 @@ sources:
   - name: NYT World News
     outlet: NYT
     section: news
+    filter: true
+    gate: true
     urls: [https://rss.nytimes.com/services/xml/rss/nyt/World.xml]
 
   - name: People's Policy Project
@@ -267,6 +336,58 @@ filters:
     - dietitian
     - nutritionist
     - "sleep better"
+
+# Shared patterns for story selection (regular expressions, case-insensitive).
+selection:
+  # Held back from sources with rumor_rules: true (unless by a pass_authors byline).
+  rumor_patterns:
+    - "\\brumou?rs?\\b"
+    - "\\bhot stove\\b"
+    - "\\breportedly\\b"
+    - "\\binterest(ed)? in\\b"
+    - "\\bpursu(e|es|ing|it)\\b"
+    - "\\blistening to (trade )?offers\\b"
+    - "\\bmeet(s|ing)? with\\b"
+    - "\\blinked to\\b"
+    - "\\bin the mix\\b"
+    - "\\bwhat I'?m hearing\\b"
+    - "\\btrade (ideas|candidates|targets)\\b"
+    - "\\bhypothetical\\b"
+    - "\\bshould (make|target|pursue|sign|trade|add)\\b"
+    - "\\bchances? of signing\\b"
+    - "\\bfavou?rites? to (sign|land)\\b"
+    - "\\blikely to (sign|trade|land)\\b"
+    - "\\blanding spots?\\b"
+    - "\\bpredictions?\\b"
+    - "\\bpower rankings\\b"
+    - "\\bmakes? sense\\b"
+    - "\\b(might|could)\\b.*\\?$"
+  # Scoops and investigations: a single-outlet story with any of these in its
+  # headline or summary passes the gate.
+  scoop_patterns:
+    - "\\bexclusive\\b"
+    - "\\bfirst reported\\b"
+    - "\\b(a|an) (Times|Post|Athletic|ESPN) (investigation|analysis|examination|review)\\b"
+    - "\\binvestigation (found|finds|shows|reveals|by)\\b"
+    - "\\b(documents|records|emails|messages) (show|obtained|reviewed|reveal|seen)\\b"
+    - "\\bobtained by\\b"
+    - "\\baccording to (internal|confidential|previously unreported|documents|records)\\b"
+    - "\\bpreviously unreported\\b"
+    - "^Sources?\\b"
+    - "\\bsources? (say|said|tell|told)\\b"
+    - ":\\s*Sources?$"
+  # Long-form features: same effect.
+  feature_patterns:
+    - "^Inside\\b"
+    - "\\binside the\\b"
+    - "\\bbehind the scenes\\b"
+    - "\\boral history\\b"
+    - "\\bhow .{3,60} came together\\b"
+    - "\\b(the )?(untold|inside) story\\b"
+    - "\\bthe making of\\b"
+  # URL fragments that mark an editors' pick. WaPo's "The 7" is its morning briefing.
+  editor_pick_urls:
+    "/the-seven/": "WaPo The 7"
 
 # Headlines matching any of these regular expressions are dropped from EVERY
 # source (not just filtered ones). Used for non-story pages that some feeds include.
