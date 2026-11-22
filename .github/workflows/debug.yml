@@ -32,7 +32,9 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Probe URLs
         if: inputs.urls != ''
-        run: python tools/probe.py ${{ inputs.urls }}
+        env:
+          URLS: ${{ inputs.urls }}
+        run: python -u tools/probe.py $URLS
       - uses: actions/cache@v4
         if: inputs.dump
         with:
