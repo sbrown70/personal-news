@@ -76,10 +76,11 @@ sources:
     outlet: Econvitals
     section: misc
     urls:
-      - https://econvitals.com/feed
-      - https://econvitals.com/rss.xml
-      - https://econvitals.substack.com/feed
-    site: https://econvitals.com
+      - https://econvitals.org/feed
+      - https://econvitals.org/rss.xml
+      - https://econvitals.org/feed.xml
+      - https://econvitals.org/index.xml
+    site: https://econvitals.org/
 
   - name: MLB.com News (replaces MLB Morning Lineup)
     outlet: MLB.com
