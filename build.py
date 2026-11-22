@@ -371,10 +371,11 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     now = time.time()
     default_ret = cfg.get("retention_hours", 72)
     sec_ret = {s["id"]: s.get("retention_hours", default_ret) * 3600 for s in cfg["sections"]}
-    max_ret = max(sec_ret.values())
+    max_ret = max([*sec_ret.values(), *(s.get("retention_hours", 0) * 3600 for s in sources)])
 
-    def expired(section: str, t: float) -> bool:
-        return now - t > sec_ret.get(section, default_ret * 3600)
+    def expired(src: dict, t: float) -> bool:
+        limit = src["retention_hours"] * 3600 if src.get("retention_hours") else sec_ret.get(src["section"], default_ret * 3600)
+        return now - t > limit
 
     log(f"Fetching {len(sources)} feeds…")
     with ThreadPoolExecutor(max_workers=12) as pool:
@@ -403,7 +404,7 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
             t = e["published"] or now
             if t > now + 3600:
                 t = now
-            if expired(src["section"], t):
+            if expired(src, t):
                 continue
             existing = fresh.get(iid)
             if existing and existing["priority"] <= src["priority"]:
@@ -446,7 +447,7 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
             del merged[iid]
             continue
         it["section"], it["outlet"], it["priority"] = s["section"], s["outlet"], s["priority"]
-        if expired(it["section"], it["time"]):
+        if expired(s, it["time"]):
             del merged[iid]
     for iid, it in fresh.items():
         prev = merged.get(iid)

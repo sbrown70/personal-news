@@ -11,6 +11,7 @@
 #   filter    true = apply the `filters` rules below (used for the NYT/WaPo
 #             replacements for the morning-briefing emails). Feeds you picked
 #             on purpose, like Ezra Klein's column, are left alone.
+#   retention_hours  (optional) overrides the section's retention for this source.
 #   priority  (optional) lower = preferred as the headline when stories merge.
 #             Defaults to the order in this file.
 #   google_news  true = the urls are Google News searches, used for sites that
@@ -114,6 +115,13 @@ sources:
     urls:
       - https://tangotiger.com/index.php/site/atom
       - http://feeds.feedburner.com/tangotiger
+
+  - name: Baseball Observer (research)
+    outlet: Baseball Observer
+    section: baseball
+    # Aggregates baseball research (papers, Substacks, team blogs); slow-moving.
+    retention_hours: 336
+    urls: ["https://baseball.observer/feed.rss?search=&sort=date&category=research"]
 
   # ---------- From Feedly: Cars ----------
   - name: Automotive News Breaking News
