@@ -22,9 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -37,13 +37,10 @@ jobs:
           path: .cache/fastembed
           key: fastembed-all-MiniLM-L6-v2-v1
 
-      - id: pages
-        uses: actions/configure-pages@v5
-
       - name: Build
         env:
           # The last published build, so stories stay on the page after they leave a feed.
-          PREVIOUS_STATE: ${{ steps.pages.outputs.base_url }}/items.json
+          PREVIOUS_STATE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/items.json
           NEWS_DEBUG: "1"
         run: python build.py
 
