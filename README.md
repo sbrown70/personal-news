@@ -34,13 +34,15 @@ Nothing is thrown away: held stories are listed on the **Held back** tab with th
 
 ## Claude review
 
-Twice a day (5:47 AM and 3:47 PM Eastern), a scheduled Claude Code session running Sonnet acts as editor for the stories the rules were unsure about. It runs on the Claude plan, with no API key. It:
+Three times a day (5:43 AM, 10:43 AM and 6:43 PM Eastern, and on request), a scheduled Claude Code session running Sonnet acts as editor for the stories the rules were unsure about. It runs on the Claude plan, with no API key. It:
 
 - **promotes** important stories the rules held back,
 - **demotes** fluff that slipped through (even when two outlets covered it),
 - **fixes merges** for story pairs near the similarity cutoff.
 
-It reads what to review from the build log (`tools/review_data.py`), records verdicts in `review/decisions.json` (`tools/apply_review.py`) and pushes, which rebuilds the page. Promoted cards carry a "Claude pick" label; demoted ones show on Held back with Claude's reason. It never touches ungated sources or allowed bylines. Its instructions, including what counts as important, are in `REVIEW.md`: edit that file to change its judgment. The schedule and the reviewer session are in claude.ai under scheduled tasks and sessions.
+It reads what to review from the build log (`tools/review_data.py`), records verdicts in `review/decisions.json` (`tools/apply_review.py`) and pushes, which rebuilds the page. Promoted cards carry a "Claude pick" label; demoted ones show on Held back with Claude's reason. It never touches ungated sources or allowed bylines. Its instructions, including what counts as important, are in `REVIEW.md`: edit that file to change its judgment.
+
+Your corrections live in `review/overrides.json`: `keep` / `hide` for individual stories (`python3 tools/override.py keep|hide <id> "note"`), and `themes`, the standing taste rules the reviewer follows. Every Sunday evening, the same session folds new notes into themes and removes story entries older than 14 days, so the file stays short. The schedule and the reviewer session are in claude.ai under scheduled tasks and sessions.
 
 ## The page
 
