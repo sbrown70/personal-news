@@ -23,6 +23,10 @@ for url in sys.argv[1:]:
             print(f"    - #{n} {e.get('published','')[:22]} | {e.get('title','')[:75]} | author={e.get('author','')} | tags={tags} | {e.get('link','')[:90]}")
         continue
     print("    start:", re.sub(r"\s+", " ", body[:200]))
+    authors = re.findall(r'"author"\s*:\s*\[?\s*\{[^}]*?"name"\s*:\s*"([^"]+)"', body)
+    authors += re.findall(r'<meta[^>]+name=["\']author["\'][^>]+content=["\']([^"\']+)', body, re.I)
+    if authors:
+        print("    authors:", list(dict.fromkeys(authors))[:6])
     feeds = sorted(set(re.findall(r'href=["\']([^"\']*(?:rss|feed|atom|\.xml)[^"\']*)', body, re.I)))[:10]
     if feeds:
         print("    feed-ish links:", feeds)
