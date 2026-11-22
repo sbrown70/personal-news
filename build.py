@@ -160,6 +160,11 @@ def fetch_source(src: dict) -> dict:
         if not link or not title:
             continue
         summary = strip_html(e.get("summary", "") or e.get("description", ""))
+        if src.get("google_news"):
+            # "Headline - ESPN" -> "Headline"; the summary just repeats the headline.
+            title = re.sub(r"\s+[-–|]\s+[^-–|]{2,40}$", "", title)
+        if summary.startswith(title[:60]):
+            summary = ""
         tags = [t.get("term", "") for t in e.get("tags", []) if t.get("term")]
         entries.append({
             "url": link,
@@ -351,7 +356,12 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
         s.setdefault("priority", i)
     reason = make_filter(cfg.get("filters", {}))
     now = time.time()
-    retention = cfg.get("retention_hours", 72) * 3600
+    default_ret = cfg.get("retention_hours", 72)
+    sec_ret = {s["id"]: s.get("retention_hours", default_ret) * 3600 for s in cfg["sections"]}
+    max_ret = max(sec_ret.values())
+
+    def expired(section: str, t: float) -> bool:
+        return now - t > sec_ret.get(section, default_ret * 3600)
 
     log(f"Fetching {len(sources)} feeds…")
     with ThreadPoolExecutor(max_workers=12) as pool:
@@ -373,7 +383,7 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
             t = e["published"] or now
             if t > now + 3600:
                 t = now
-            if now - t > retention:
+            if expired(src["section"], t):
                 continue
             existing = fresh.get(iid)
             if existing and existing["priority"] <= src["priority"]:
@@ -404,7 +414,7 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     # Merge with the previous build so stories persist after they fall out of a feed.
     merged: dict[str, dict] = {}
     for old in load_previous(previous):
-        if now - old.get("time", 0) <= retention and old.get("id"):
+        if old.get("id") and now - old.get("time", 0) <= max_ret:
             merged[old["id"]] = old
     src_by_name = {s["name"]: s for s in sources}
     for iid, it in list(merged.items()):
@@ -416,12 +426,14 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
             del merged[iid]
             continue
         it["section"], it["outlet"], it["priority"] = s["section"], s["outlet"], s["priority"]
+        if expired(it["section"], it["time"]):
+            del merged[iid]
     for iid, it in fresh.items():
         prev = merged.get(iid)
         it["first_seen"] = prev.get("first_seen", now) if prev else now
         merged[iid] = it
     items = sorted(merged.values(), key=lambda x: -x["time"])
-    log(f"{len(items)} stories in the {cfg.get('retention_hours', 72)}h window")
+    log(f"{len(items)} stories on the page")
 
     groups = cluster(items, cfg.get("similarity_threshold", 0.62), cfg.get("merge_window_hours", 48))
     section_order = [s["id"] for s in cfg["sections"]]

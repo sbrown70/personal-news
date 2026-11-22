@@ -37,7 +37,7 @@ jobs:
         if: inputs.dump
         with:
           path: .cache/fastembed
-          key: fastembed-debug-${{ inputs.models }}
+          key: fastembed-debug-v1
       - name: Build with data dump
         if: inputs.dump
         env:

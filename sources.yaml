@@ -13,14 +13,19 @@
 #             on purpose, like Ezra Klein's column, are left alone.
 #   priority  (optional) lower = preferred as the headline when stories merge.
 #             Defaults to the order in this file.
+#   google_news  true = the urls are Google News searches, used for sites that
+#             block automated feed readers. Links go through news.google.com,
+#             which forwards you to the article.
 
 sections:
-  - {id: news,     label: "News"}
-  - {id: baseball, label: "Baseball"}
-  - {id: cars,     label: "Cars"}
-  - {id: misc,     label: "Policy & Ideas"}
-  - {id: science,  label: "Science"}
-  - {id: ai,       label: "AI"}
+  # retention_hours: how long stories stay. Slow-moving sections keep them longer
+  # so a weekly column or monthly issue doesn't vanish before you see it.
+  - {id: news,     label: "News",           retention_hours: 72}
+  - {id: baseball, label: "Baseball",       retention_hours: 72}
+  - {id: cars,     label: "Cars",           retention_hours: 72}
+  - {id: misc,     label: "Policy & Ideas", retention_hours: 336}
+  - {id: science,  label: "Science",        retention_hours: 336}
+  - {id: ai,       label: "AI",             retention_hours: 336}
 
 sources:
   # ---------- Replacements for the morning emails ----------
@@ -102,7 +107,9 @@ sources:
   - name: ESPN MLB
     outlet: ESPN
     section: baseball
-    urls: [https://www.espn.com/espn/rss/mlb/news]
+    # ESPN's own feed (espn.com/espn/rss/mlb/news) blocks GitHub's servers.
+    google_news: true
+    urls: ["https://news.google.com/rss/search?q=site:espn.com/mlb+when:3d&hl=en-US&gl=US&ceid=US:en"]
 
   - name: FanGraphs
     outlet: FanGraphs
@@ -113,26 +120,24 @@ sources:
   - name: Tangotiger Blog
     outlet: Tangotiger
     section: baseball
-    urls: [https://tangotiger.com/index.php/site/rss_2.0]
-    site: https://tangotiger.com
+    urls:
+      - https://tangotiger.com/index.php/site/atom
+      - http://feeds.feedburner.com/tangotiger
 
   # ---------- From Feedly: Cars ----------
   - name: Automotive News Breaking News
     outlet: Automotive News
     section: cars
-    urls:
-      - https://www.autonews.com/arc/outboundfeeds/rss/?outputType=xml
-      - https://www.autonews.com/rss/breaking-news
-      - https://www.autonews.com/rss.xml
-    site: https://www.autonews.com
+    # autonews.com blocks GitHub's servers outright.
+    google_news: true
+    urls: ["https://news.google.com/rss/search?q=site:autonews.com+when:3d&hl=en-US&gl=US&ceid=US:en"]
 
   - name: Classic Motorsports
     outlet: Classic Motorsports
     section: cars
-    urls:
-      - https://classicmotorsports.com/articles/rss/
-      - https://classicmotorsports.com/rss/
-    site: https://classicmotorsports.com
+    # No public feed on the site.
+    google_news: true
+    urls: ["https://news.google.com/rss/search?q=site:classicmotorsports.com+when:7d&hl=en-US&gl=US&ceid=US:en"]
 
   - name: GM Authority
     outlet: GM Authority
@@ -264,7 +269,7 @@ filters:
     - nutritionist
     - "sleep better"
 
-# How long stories stay on the page.
+# Default for sections that don't set retention_hours.
 retention_hours: 72
 
 # Stories whose text similarity is at or above this get merged into one card.
