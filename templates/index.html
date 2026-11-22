@@ -73,6 +73,8 @@ nav.tabs::-webkit-scrollbar { display: none; }
 }
 .check:hover { border-color: var(--muted); color: var(--text); }
 .card.read .check { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.later.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.later.on svg { fill: currentColor; }
 .summary { margin: 6px 0 0; color: var(--muted); font-size: 14.5px; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; }
 .chip {
@@ -117,7 +119,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; text-align: cen
     <button class="btn" id="markAll">Mark all read</button>
   </div>
   <main id="main"></main>
-  <footer>Built from public RSS feeds. Read state is stored only in this browser.</footer>
+  <footer>Built from public RSS feeds. Read state and Read later are stored only in this browser.</footer>
 </div>
 <script>
 const DATA = /*__DATA__*/null;
@@ -130,8 +132,26 @@ const store = {
 // Read state: link id -> time read. Pruned after 8 days.
 const now = Date.now() / 1000;
 let read = store.get("read", {});
-for (const k in read) if (now - read[k] > 8 * 86400) delete read[k];
+const savedIds = new Set(Object.values(store.get("later", {})).flatMap(v => v.c.links.map(l => l.id)));
+for (const k in read) if (now - read[k] > 8 * 86400 && !savedIds.has(k)) delete read[k];
 store.set("read", read);
+
+// Read later: lead link id -> a copy of the story, so it stays after it ages off the page.
+// Kept until you remove it. Lives only in this browser.
+let later = store.get("later", {});
+const laterKey = c => c.links[0].id;
+const isLater = c => c.links.some(l => later[l.id]);
+function liveFor(key) { return [...DATA.clusters, ...DATA.held].find(c => c.links.some(l => l.id === key)); }
+function laterClusters() {
+  // Newest saves first; use today's version of the story when it's still on the page.
+  return Object.entries(later).sort((a, b) => b[1].saved - a[1].saved).map(([k, v]) => liveFor(k) || v.c);
+}
+function toggleLater(c) {
+  const hit = c.links.find(l => later[l.id]);
+  if (hit) delete later[hit.id];
+  else later[laterKey(c)] = { saved: Date.now() / 1000, c: { id: c.id, title: c.title, summary: c.summary || "", links: c.links, outlets: c.outlets, time: c.time, section: c.section, signal: c.signal || "" } };
+  store.set("later", later);
+}
 
 // "New" = first seen after your previous visit (a visit = 30+ minutes since the last one).
 const visits = store.get("visits", { prev: 0, cur: 0 });
@@ -170,6 +190,7 @@ function topClusters() {
 }
 function clustersFor(tab) {
   if (tab === "top") return topClusters();
+  if (tab === "later") return laterClusters();
   if (tab === "held") return DATA.held;
   if (tab === "promoted") return [...DATA.clusters, ...DATA.held].filter(c => ["promoted", "hidden by you"].includes(c.review)).sort((a, b) => b.time - a.time);
   if (tab === "demoted") return [...DATA.clusters, ...DATA.held].filter(c => ["demoted", "kept by you"].includes(c.review)).sort((a, b) => b.time - a.time);
@@ -178,13 +199,16 @@ function clustersFor(tab) {
 }
 
 function renderTabs() {
-  const tabs = [{ id: "top", label: "Top Stories" }, { id: "all", label: "Everything" }, ...DATA.sections,
+  const tabs = [{ id: "top", label: "Top Stories" }, { id: "later", label: "Read later" }, { id: "all", label: "Everything" }, ...DATA.sections,
     { id: "promoted", label: "Promoted" }, { id: "demoted", label: "Demoted" },
     { id: "held", label: "Held back" }, { id: "status", label: "Feeds" }];
   const el = document.getElementById("tabs");
   el.innerHTML = tabs.map(t => {
     let n = "";
-    if (t.id !== "status") {
+    if (t.id === "later") {
+      const k = Object.keys(later).length;
+      if (k) n = `<span class="n">${k}</span>`;
+    } else if (t.id !== "status") {
       const unread = clustersFor(t.id).filter(c => !isRead(c)).length;
       n = `<span class="n">${unread}</span>`;
     } else {
@@ -211,10 +235,13 @@ function card(c) {
     const label = seen[l.outlet] > 1 ? `${l.outlet} ${seen[l.outlet]}` : l.outlet;
     return `<a class="chip${i === 0 ? " lead" : ""}" href="${esc(l.url)}" target="_blank" rel="noopener" data-c="${c.id}" title="${esc(l.title)}">${esc(label)}</a>`;
   }).join("");
-  const r = isRead(c);
+  const r = isRead(c), sv = isLater(c);
   return `<article class="card${r ? " read" : ""}" data-id="${c.id}">
     <div class="head">
       <h2><a href="${esc(c.links[0].url)}" target="_blank" rel="noopener" data-c="${c.id}">${esc(c.title)}</a></h2>
+      <button class="check later${sv ? " on" : ""}" data-later="${c.id}" aria-label="${sv ? "Remove from Read later" : "Read later"}" title="${sv ? "Remove from Read later" : "Read later"}">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
+      </button>
       <button class="check" data-toggle="${c.id}" aria-label="${r ? "Mark unread" : "Mark read"}" title="${r ? "Mark unread" : "Mark read"}">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3L13 4.5"/></svg>
       </button>
@@ -230,19 +257,20 @@ function card(c) {
 
 function renderList() {
   let list = clustersFor(state.tab);
-  if (state.hideRead) list = list.filter(c => !isRead(c));
+  if (state.hideRead && state.tab !== "later") list = list.filter(c => !isRead(c));
   if (state.q) {
     const q = state.q.toLowerCase();
     list = list.filter(c => c.links.some(l => l.title.toLowerCase().includes(q) || l.outlet.toLowerCase().includes(q)) || c.summary.toLowerCase().includes(q));
   }
   const notes = {
+    later: "Stories you saved with the bookmark button, read or not. They stay here, even after they leave the rest of the page, until you tap the bookmark again. Saved only in this browser.",
     held: "Stories kept off the main page: rumors and clickbait, and stories only one outlet covered that showed no sign of being important (not on NYT's front page or in WaPo's The 7, no scoop or feature language). Nothing here is counted in the other tabs.",
     promoted: "Stories the Claude review moved onto the main page from Held back, with its reason. To reverse one, add its id under \"hide\" in review/overrides.json (or ask Claude Code to). Reversals show here as \"Hidden by you\", and the reviewer learns from them.",
     demoted: "Stories the Claude review took off the main page, with its reason. To reverse one, add its id under \"keep\" in review/overrides.json (or ask Claude Code to). Reversals show here as \"Kept by you\", and the reviewer learns from them.",
   };
   const note = notes[state.tab] ? `<p class="note">${notes[state.tab]}</p>` : "";
-  if (!list.length) return note + `<p class="empty">${state.hideRead ? "All caught up." : "Nothing here yet."}</p>`;
-  if (state.tab === "top") return list.map(card).join("");
+  if (!list.length) return note + `<p class="empty">${state.tab === "later" ? "Nothing saved yet. Tap the bookmark on any story." : state.hideRead ? "All caught up." : "Nothing here yet."}</p>`;
+  if (state.tab === "top" || state.tab === "later") return list.map(card).join("");
   let out = note, last = "";
   for (const c of list) {
     const d = dayLabel(c.time);
@@ -277,11 +305,13 @@ function markRead(ids, value) {
   for (const id of ids) { if (value) read[id] = t; else delete read[id]; }
   store.set("read", read);
 }
-const byId = id => DATA.clusters.find(c => c.id === id) || DATA.held.find(c => c.id === id);
+const byId = id => DATA.clusters.find(c => c.id === id) || DATA.held.find(c => c.id === id) || Object.values(later).map(v => v.c).find(c => c.id === id);
 
 document.addEventListener("click", e => {
   const tab = e.target.closest("[data-tab]");
   if (tab) { state.tab = tab.dataset.tab; store.set("tab", state.tab); render(); window.scrollTo({ top: 0 }); return; }
+  const sv = e.target.closest("[data-later]");
+  if (sv) { toggleLater(byId(sv.dataset.later)); render(); return; }
   const tog = e.target.closest("[data-toggle]");
   if (tog) { const c = byId(tog.dataset.toggle); markRead(c.links.map(l => l.id), !isRead(c)); render(); return; }
   const link = e.target.closest("a[data-c]");
@@ -305,7 +335,7 @@ document.getElementById("markAll").onclick = () => {
 document.getElementById("q").oninput = e => { state.q = e.target.value.trim(); document.getElementById("main").innerHTML = renderList(); };
 
 document.getElementById("updated").textContent = "Updated " + new Date(DATA.generated * 1000).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
-if (!["top", "all", "promoted", "demoted", "held", "status", ...DATA.sections.map(s => s.id)].includes(state.tab)) state.tab = "top";
+if (!["top", "later", "all", "promoted", "demoted", "held", "status", ...DATA.sections.map(s => s.id)].includes(state.tab)) state.tab = "top";
 if (state.tab === "top" && !topClusters().length) state.tab = "all";
 render();
 </script>

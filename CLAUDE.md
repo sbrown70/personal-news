@@ -11,7 +11,7 @@ A personal news page for one reader. It combines their RSS feeds (formerly in Fe
 | `.github/workflows/build.yml` | Hourly (and on every push to `main`): runs `build.py`, publishes `site/` to GitHub Pages. |
 | `build.py` | Fetches feeds → filters (opinion, cooking, wellness) → holds back rumors and clickbait → merges duplicates (sentence embeddings + TF-IDF) → gates single-outlet stories → applies the Claude review → writes `site/index.html` + `site/items.json`. |
 | `sources.yaml` | All feeds and all rules: sections, `gate`, `rumor_rules`, `drop_titles`, `pass_authors`, `pass_keywords`, shared `selection` patterns, merge threshold. Comments explain each field. |
-| `templates/index.html` | The page. Tabs: Top Stories, Everything, sections, Promoted, Demoted, Held back, Feeds. Read state lives in the browser's local storage. |
+| `templates/index.html` | The page. Tabs: Top Stories, Read later, Everything, sections, Promoted, Demoted, Held back, Feeds. Read state and Read later (a saved copy of each story, kept until removed) live in the browser's local storage. |
 | `REVIEW.md` | Instructions for the Claude review (the editor pass) and the weekly overrides tidy. |
 | `review/decisions.json` | Claude's verdicts (promote, demote, pair merges, what's been reviewed). Written only by `tools/apply_review.py`. |
 | `review/overrides.json` | The reader's own corrections: `themes` (standing taste rules), `keep` / `hide` (story ids). The reader's choices beat Claude's. |
