@@ -269,12 +269,22 @@ filters:
     - nutritionist
     - "sleep better"
 
+# Headlines matching any of these regular expressions are dropped from EVERY
+# source (not just filtered ones). Used for non-story pages that some feeds include.
+always_drop_titles:
+  - "^View (Interior|Exterior) Photos of"
+  - "^Photos: "
+
 # Default for sections that don't set retention_hours.
 retention_hours: 72
 
-# Stories whose text similarity is at or above this get merged into one card.
+# Stories scoring at or above this get merged into one card. The score is
+# meaning-similarity (0-1) plus lexical_weight x shared-rare-word similarity (0-1).
 # Raise it if unrelated stories are being merged; lower it if duplicates slip through.
-similarity_threshold: 0.62
+# 0.70 / 0.3 were tuned on ~350 hand-labelled story pairs (about 94% of merges
+# correct, about 80% of true duplicates caught).
+similarity_threshold: 0.70
+lexical_weight: 0.3
 
 # Stories published further apart than this are never merged.
 merge_window_hours: 48

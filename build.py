@@ -165,6 +165,8 @@ def fetch_source(src: dict) -> dict:
             title = re.sub(r"\s+[-–|]\s+[^-–|]{2,40}$", "", title)
         if summary.startswith(title[:60]):
             summary = ""
+        if len(title.split()) < 4:
+            continue  # section index pages and teasers ("Chevrolet News", "Here's the latest.")
         tags = [t.get("term", "") for t in e.get("tags", []) if t.get("term")]
         entries.append({
             "url": link,
@@ -247,8 +249,14 @@ def tfidf(texts: list[str]) -> np.ndarray:
     return mat
 
 
-def cluster(items: list[dict], threshold: float, window_h: float) -> list[list[int]]:
-    """Average-linkage clustering on cosine similarity, restricted to a time window."""
+def cluster(items: list[dict], threshold: float, window_h: float, lex_weight: float = 0.3) -> list[list[int]]:
+    """Average-linkage clustering, restricted to a time window.
+
+    Similarity = sentence-embedding cosine + lex_weight * TF-IDF cosine. The
+    embedding catches paraphrases ("Fed holds rates" / "Federal Reserve leaves
+    rates unchanged"); the TF-IDF term rewards shared rare words (names, places),
+    which keeps same-topic-but-different stories (two prospect lists) apart.
+    """
     n = len(items)
     if n == 0:
         return []
@@ -259,7 +267,10 @@ def cluster(items: list[dict], threshold: float, window_h: float) -> list[list[i
 
     texts = [f"{it['title']}. {it['summary'][:300]}" for it in items]
     vecs = embed(texts)
-    sim = vecs @ vecs.T
+    emb = vecs @ vecs.T
+    lex_vecs = tfidf(texts)
+    lex_vecs /= np.maximum(np.linalg.norm(lex_vecs, axis=1, keepdims=True), 1e-9)
+    sim = emb + lex_weight * (lex_vecs @ lex_vecs.T)
     times = np.array([it["time"] for it in items], dtype=np.float64)
     far = np.abs(times[:, None] - times[None, :]) > window_h * 3600
     sim[far] = 0.0
@@ -267,9 +278,10 @@ def cluster(items: list[dict], threshold: float, window_h: float) -> list[list[i
     # (e.g. the same article listed under two section feeds with different URLs).
     outlets = np.array([it["outlet"] for it in items])
     same = outlets[:, None] == outlets[None, :]
-    sim[same] = np.where(sim[same] >= 0.9, sim[same], 0.0)
-    np.fill_diagonal(sim, 1.0)
-    dist = np.clip(1.0 - sim, 0.0, 2.0)
+    sim[same & (emb < 0.9)] = 0.0
+    top = 1.0 + lex_weight
+    np.fill_diagonal(sim, top)
+    dist = np.clip(top - sim, 0.0, 3.0)
     dist = (dist + dist.T) / 2
     np.fill_diagonal(dist, 0.0)
 
@@ -279,7 +291,7 @@ def cluster(items: list[dict], threshold: float, window_h: float) -> list[list[i
         _dump(items, vecs)
 
     z = linkage(squareform(dist, checks=False), method="average")
-    labels = fcluster(z, t=1.0 - threshold, criterion="distance")
+    labels = fcluster(z, t=top - threshold, criterion="distance")
     groups: dict[int, list[int]] = {}
     for i, lab in enumerate(labels):
         groups.setdefault(int(lab), []).append(i)
@@ -316,7 +328,7 @@ def _debug_pairs(items, sim, outlets, threshold):
     """Print cross-outlet pairs near the threshold so it can be tuned."""
     iu = np.triu_indices(len(items), 1)
     vals = sim[iu]
-    mask = (vals > threshold - 0.12) & (vals < threshold + 0.12) & (outlets[iu[0]] != outlets[iu[1]])
+    mask = (vals > threshold - 0.1) & (vals < threshold + 0.1) & (outlets[iu[0]] != outlets[iu[1]])
     idx = np.argsort(-vals[mask])[:60]
     a, b, v = iu[0][mask][idx], iu[1][mask][idx], vals[mask][idx]
     log(f"--- pairs near threshold {threshold} ({embed.method}) ---")
@@ -355,6 +367,7 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     for i, s in enumerate(sources):
         s.setdefault("priority", i)
     reason = make_filter(cfg.get("filters", {}))
+    always_drop = [re.compile(p, re.I) for p in cfg.get("always_drop_titles", [])]
     now = time.time()
     default_ret = cfg.get("retention_hours", 72)
     sec_ret = {s["id"]: s.get("retention_hours", default_ret) * 3600 for s in cfg["sections"]}
@@ -370,9 +383,12 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     status = []
     filtered_log = []
     fresh: dict[str, dict] = {}
+    seen_titles: set[tuple[str, str]] = set()  # (outlet, title): same story under two URLs
     for src, res in zip(sources, results):
         kept = dropped = 0
         for e in res["entries"]:
+            if any(p.search(e["title"]) for p in always_drop):
+                continue
             why = reason(e) if src.get("filter") else None
             if why:
                 dropped += 1
@@ -380,6 +396,10 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
                 continue
             norm = normalize_url(e["url"])
             iid = item_id(norm)
+            tkey = (src["outlet"], e["title"].lower())
+            if tkey in seen_titles and iid not in fresh:
+                continue
+            seen_titles.add(tkey)
             t = e["published"] or now
             if t > now + 3600:
                 t = now
@@ -435,7 +455,8 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     items = sorted(merged.values(), key=lambda x: -x["time"])
     log(f"{len(items)} stories on the page")
 
-    groups = cluster(items, cfg.get("similarity_threshold", 0.62), cfg.get("merge_window_hours", 48))
+    groups = cluster(items, cfg.get("similarity_threshold", 0.70), cfg.get("merge_window_hours", 48),
+                     cfg.get("lexical_weight", 0.3))
     section_order = [s["id"] for s in cfg["sections"]]
     clusters = []
     for g in groups:
