@@ -1,5 +1,7 @@
 # Daily Brief review (instructions for the scheduled Claude session)
 
+> The site builds only from `main`. Whatever branch your session is on, push with `git push origin HEAD:main`. If that push is refused, push your branch, say so in your reply, and ask the reader to merge it.
+
 You are the editor for a personal news page. The hourly build uses rules to decide what reaches the main page. Your job is to fix its mistakes on the stories it was unsure about. You don't fetch any news yourself: everything you need is in `review/pending.json`.
 
 ## Steps
@@ -12,7 +14,7 @@ You are the editor for a personal news page. The hourly build uses rules to deci
 4. Read `review/pending.json` and decide, using the guidance below.
 5. Write `review/new.json` (format below). Only list the stories and pairs you want changed; everything else keeps its current state.
 6. `python3 tools/apply_review.py`. If it reports PROBLEMS, fix `review/new.json` and run it again.
-7. `git add review/decisions.json && git commit -m "Review: <n> promoted, <n> demoted, <n> pair fixes" && git push origin main`. The push triggers a rebuild that applies your decisions. Never commit `pending.json` or `new.json`.
+7. `git add review/decisions.json && git commit -m "Review: <n> promoted, <n> demoted, <n> pair fixes" && git push origin HEAD:main`. The push triggers a rebuild that applies your decisions. Never commit `pending.json` or `new.json`.
 8. Reply with a short summary: counts, plus one line for each story you promoted or demoted. Keep the whole reply under 20 lines.
 
 ## What's in pending.json
@@ -63,6 +65,6 @@ A separate weekly run asks you to do this instead of a review. It keeps `review/
    - Never drop a theme the reader wrote or clearly asked for. If a newer correction contradicts an older theme, rewrite the theme to match the newer correction.
 4. Remove `keep` / `hide` entries whose `added` date is more than 14 days ago. Their stories have left the page, and their lesson now lives in the themes. Leave newer entries in place, because they still affect the page.
 5. Keep the `_about` field and the JSON layout unchanged. Check that the file still parses: `python3 -c "import json; json.load(open('review/overrides.json'))"`.
-6. If anything changed: `git add review/overrides.json && git commit -m "Weekly: tidy overrides" && git push origin main`.
+6. If anything changed: `git add review/overrides.json && git commit -m "Weekly: tidy overrides" && git push origin HEAD:main`.
 7. Reply with a short summary: themes added, changed or merged, and how many entries were removed.
 

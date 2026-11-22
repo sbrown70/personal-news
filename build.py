@@ -287,6 +287,8 @@ VISIBLE_SIGNALS = ("NYT front page", "WaPo The 7", "Scoop", "Feature", "Claude p
 def embed(texts: list[str]) -> np.ndarray:
     """Sentence embeddings (normalized). Falls back to TF-IDF if the model can't load."""
     try:
+        if os.environ.get("NEWS_TFIDF_ONLY"):
+            raise RuntimeError("NEWS_TFIDF_ONLY is set")
         from fastembed import TextEmbedding
 
         cache = os.environ.get("FASTEMBED_CACHE_PATH", str(ROOT / ".cache" / "fastembed"))
@@ -595,6 +597,7 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     clusters.sort(key=lambda c: -c["time"])
     held.sort(key=lambda c: -c["time"])
     emit_review_data(clusters, held, borderline, items, review, threshold, now)
+    emit_card_index(clusters, held)
     multi = sum(1 for c in clusters if len(c["links"]) > 1)
     log(f"{len(clusters)} cards ({multi} with coverage from more than one link), similarity via {getattr(embed, 'method', 'n/a')}")
     log(f"{len(held)} held back ({single_outlet_held} single-outlet stories without an importance signal)")
@@ -736,6 +739,24 @@ def emit_review_data(clusters, held, borderline, items, review, threshold, now) 
     log(f"   for review: {len(data['held'])} held, {len(data['shown'])} shown, {len(data['pairs'])} borderline pairs")
     blob = base64.b64encode(gzip.compress(json.dumps(data, ensure_ascii=False).encode())).decode()
     print("REVIEWDATA:" + blob, flush=True)
+
+
+def emit_card_index(clusters: list[dict], held: list[dict]) -> None:
+    """Print one compressed CARDINDEX line: every card's ids, title and status.
+
+    tools/find_story.py reads it so a session can find a story's id by headline
+    (for keep/hide overrides) without loading the published page.
+    """
+    import base64
+    import gzip
+
+    rows = [
+        {"ids": [l["id"] for l in c["links"]], "title": c["title"], "outlets": sorted({l["outlet"] for l in c["links"]}),
+         "status": status, "why": c.get("reason") or c.get("signal") or ""}
+        for status, cards in (("shown", clusters), ("held", held)) for c in cards
+    ]
+    blob = base64.b64encode(gzip.compress(json.dumps(rows, ensure_ascii=False).encode())).decode()
+    print("CARDINDEX:" + blob, flush=True)
 
 
 def _card(members: list[dict], section: str, now: float) -> dict:

@@ -28,7 +28,8 @@ def repo_name() -> str:
     return m.group(1)
 
 
-def main() -> None:
+def latest_build_line(tag: str) -> tuple[dict, object]:
+    """Return (run info, decoded payload) for the last `TAG:` line in the latest successful build log."""
     repo = repo_name()
     runs = json.loads(gh("run", "list", "-R", repo, "--workflow", "build.yml", "--status", "success",
                          "--limit", "1", "--json", "databaseId,createdAt"))
@@ -38,10 +39,14 @@ def main() -> None:
     jobs = json.loads(gh("run", "view", str(run["databaseId"]), "-R", repo, "--json", "jobs"))["jobs"]
     job = next(j for j in jobs if j["name"] == "build")
     log = gh("api", f"repos/{repo}/actions/jobs/{job['databaseId']}/logs")
-    blobs = re.findall(r"REVIEWDATA:(\S+)", log)
+    blobs = re.findall(tag + r":(\S+)", log)
     if not blobs:
-        sys.exit("that build has no REVIEWDATA line")
-    data = json.loads(gzip.decompress(base64.b64decode(blobs[-1])))
+        sys.exit(f"that build has no {tag} line")
+    return run, json.loads(gzip.decompress(base64.b64decode(blobs[-1])))
+
+
+def main() -> None:
+    run, data = latest_build_line("REVIEWDATA")
     data["build_run"] = run["databaseId"]
     data["build_time"] = run["createdAt"]
     out = ROOT / "review" / "pending.json"
