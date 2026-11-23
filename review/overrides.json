@@ -1,7 +1,8 @@
 {
   "_about": "Your corrections to the Claude review. 'themes' are standing taste rules distilled from past corrections; the reviewer follows them. 'keep' / 'hide' hold individual stories (by id) to show or keep off the page, each with a note and the date it was added. A weekly job folds new notes into themes and removes story entries older than 14 days, after their stories have left the page. Add entries with: python3 tools/override.py keep|hide <id> \"note\"",
   "themes": [
-    "Exclude forum posts and discussion threads from any source (Knife sharpener thoughts and knife angle musings | Off-Topic Discussion forum)."
+    "Exclude forum posts and discussion threads from any source (Knife sharpener thoughts and knife angle musings | Off-Topic Discussion forum).",
+    "Light or quirky stories are welcome when they earned their place: covered by two outlets or picked for WaPo's The 7 (Bigfoot, Fiona the hippo, record bird migration)."
   ],
   "keep": {
     "c3af9b2361f3": {
