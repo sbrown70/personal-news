@@ -106,6 +106,13 @@ sources:
     filter: true
     urls: [https://feeds.washingtonpost.com/rss/business]
 
+  - name: WaPo Technology
+    gate: true
+    outlet: WaPo
+    section: news
+    filter: true
+    urls: [https://feeds.washingtonpost.com/rss/business/technology]
+
   - name: MLB.com News (replaces MLB Morning Lineup)
     outlet: MLB.com
     section: baseball
