@@ -14,6 +14,8 @@
 #   retention_hours  (optional) overrides the section's retention for this source.
 #   priority  (optional) lower = preferred as the headline when stories merge.
 #             Defaults to the order in this file.
+#   min_title_words  (optional, default 4) shorter headlines are skipped as
+#             section pages and teasers. Lower it for blogs with short titles.
 #   google_news  true = the urls are Google News searches, used for sites that
 #             block automated feed readers. Links go through news.google.com,
 #             which forwards you to the article.
@@ -271,6 +273,7 @@ sources:
     outlet: Marginal Revolution
     section: misc
     retention_hours: 72          # several posts a day; don't keep two weeks' worth
+    min_title_words: 1           # short titles are normal here ("Sunday assorted links")
     only_authors: [Tyler Cowen]  # no Alex Tabarrok posts
     exclude_titles:
       - "emergent ventures.*(cohort|winners)"   # prize-winner announcements ("Emergent Ventures, 60th cohort")

@@ -165,7 +165,7 @@ def fetch_source(src: dict) -> dict:
             title = re.sub(r"\s+[-–|]\s+[^-–|]{2,40}$", "", title)
         if summary.startswith(title[:60]):
             summary = ""
-        if len(title.split()) < 4:
+        if len(title.split()) < src.get("min_title_words", 4):
             continue  # section index pages and teasers ("Chevrolet News", "Here's the latest.")
         tags = [t.get("term", "") for t in e.get("tags", []) if t.get("term")]
         entries.append({
