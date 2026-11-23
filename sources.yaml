@@ -30,6 +30,10 @@
 #   drop_question_headlines  true = hold back headlines ending in "?".
 #   pass_authors  bylines that always show and skip the rumor rules.
 #   pass_keywords  regexes; a headline matching one passes the gate.
+#
+# Dropping entirely (listed under "Filtered out" on the Feeds tab, never shown):
+#   only_authors   keep only posts whose byline contains one of these names.
+#   exclude_titles regexes; a matching headline is dropped.
 
 sections:
   # retention_hours: how long stories stay. Slow-moving sections keep them longer
@@ -262,6 +266,16 @@ sources:
     section: misc
     urls: [https://www.peoplespolicyproject.org/feed/]
     site: https://www.peoplespolicyproject.org
+
+  - name: Marginal Revolution
+    outlet: Marginal Revolution
+    section: misc
+    retention_hours: 72          # several posts a day; don't keep two weeks' worth
+    only_authors: [Tyler Cowen]  # no Alex Tabarrok posts
+    exclude_titles:
+      - "emergent ventures.*(cohort|winners)"   # prize-winner announcements ("Emergent Ventures, 60th cohort")
+    urls: [https://marginalrevolution.com/feed]
+    site: https://marginalrevolution.com
 
   - name: Physics Today
     outlet: Physics Today

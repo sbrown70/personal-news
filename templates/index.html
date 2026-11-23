@@ -288,7 +288,7 @@ function renderStatus() {
   const filtered = DATA.filtered.slice(0, 200).map(f => `<tr><td><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.title)}</a><div class="small">${esc(f.source)}</div></td><td class="small">${esc(f.why)}</td></tr>`).join("");
   return `<table class="status-table"><thead><tr><th></th><th>Feed</th><th>Stories</th><th>Filtered</th></tr></thead><tbody>${rows}</tbody></table>
     <h3>Filtered out this run</h3>
-    <p class="small">Opinion, cooking and wellness stories dropped from the NYT and WaPo feeds. Edit the rules in sources.yaml.</p>
+    <p class="small">Stories dropped by rule: opinion, cooking and wellness from the NYT and WaPo feeds, plus per-source exclusions (only_authors, exclude_titles). Edit the rules in sources.yaml.</p>
     <table class="status-table"><tbody>${filtered || '<tr><td class="small">None</td></tr>'}</tbody></table>`;
 }
 

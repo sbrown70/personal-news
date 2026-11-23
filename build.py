@@ -468,6 +468,8 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
     selector = Selector(cfg, sources)
     review = load_review(ROOT / "review" / "decisions.json")
     always_drop = [re.compile(p, re.I) for p in cfg.get("always_drop_titles", [])]
+    for s in sources:
+        s["_exclude"] = _rx(s.get("exclude_titles"))
     now = time.time()
     default_ret = cfg.get("retention_hours", 72)
     sec_ret = {s["id"]: s.get("retention_hours", default_ret) * 3600 for s in cfg["sections"]}
@@ -491,6 +493,15 @@ def build(config_path: Path, out_dir: Path, previous: str | None) -> None:
             if any(p.search(e["title"]) for p in always_drop):
                 continue
             why = reason(e) if src.get("filter") else None
+            if not why and src.get("only_authors"):
+                au = e["author"].lower()
+                if not any(n.lower() in au for n in src["only_authors"]):
+                    why = f"author {e['author'] or 'unknown'} not in only_authors"
+            if not why:
+                for p in src.get("_exclude", []):
+                    if p.search(e["title"]):
+                        why = "exclude_titles"
+                        break
             if why:
                 dropped += 1
                 filtered_log.append({"source": src["name"], "title": e["title"], "url": e["url"], "why": why})
