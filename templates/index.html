@@ -75,6 +75,12 @@ nav.tabs::-webkit-scrollbar { display: none; }
 .card.read .check { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 .later.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 .later.on svg { fill: currentColor; }
+.sync { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 12px 0; font-size: 14px; }
+.sync p { margin: 0 0 10px; color: var(--muted); }
+.sync .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.sync textarea { width: 100%; box-sizing: border-box; min-height: 64px; font: 12px ui-monospace, monospace; padding: 8px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text); resize: vertical; }
+.sync .msg { color: var(--accent); font-weight: 600; min-height: 1em; margin: 6px 0 0; }
 .summary { margin: 6px 0 0; color: var(--muted); font-size: 14.5px; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; }
 .chip {
@@ -117,9 +123,10 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; text-align: cen
     <input type="search" id="q" placeholder="Search headlines" aria-label="Search headlines">
     <button class="btn" id="hideRead" aria-pressed="false">Hide read</button>
     <button class="btn" id="markAll">Mark all read</button>
+    <button class="btn" id="syncBtn" aria-pressed="false" style="display:none">Sync…</button>
   </div>
   <main id="main"></main>
-  <footer>Built from public RSS feeds. Read state and Read later are stored only in this browser.</footer>
+  <footer>Built from public RSS feeds. Read state and Read later are stored only in this browser (Read later has a Sync button).</footer>
 </div>
 <script>
 const DATA = /*__DATA__*/null;
@@ -139,18 +146,58 @@ store.set("read", read);
 // Read later: lead link id -> a copy of the story, so it stays after it ages off the page.
 // Kept until you remove it. Lives only in this browser.
 let later = store.get("later", {});
+// Removals, remembered so a sync from another device doesn't bring a story back. Kept 90 days.
+let laterGone = store.get("laterGone", {});
+for (const k in laterGone) if (now - laterGone[k] > 90 * 86400) delete laterGone[k];
 const laterKey = c => c.links[0].id;
 const isLater = c => c.links.some(l => later[l.id]);
 function liveFor(key) { return [...DATA.clusters, ...DATA.held].find(c => c.links.some(l => l.id === key)); }
 function laterClusters() {
   // Newest saves first; use today's version of the story when it's still on the page.
-  return Object.entries(later).sort((a, b) => b[1].saved - a[1].saved).map(([k, v]) => liveFor(k) || v.c);
+  const seen = new Set();
+  return Object.entries(later).sort((a, b) => b[1].saved - a[1].saved).map(([k, v]) => liveFor(k) || v.c)
+    .filter(c => !seen.has(c.id) && seen.add(c.id));
 }
 function toggleLater(c) {
-  const hit = c.links.find(l => later[l.id]);
-  if (hit) delete later[hit.id];
-  else later[laterKey(c)] = { saved: Date.now() / 1000, c: { id: c.id, title: c.title, summary: c.summary || "", links: c.links, outlets: c.outlets, time: c.time, section: c.section, signal: c.signal || "" } };
-  store.set("later", later);
+  const t = Date.now() / 1000;
+  const hits = c.links.filter(l => later[l.id]);
+  if (hits.length) for (const l of hits) { delete later[l.id]; laterGone[l.id] = t; }
+  else {
+    later[laterKey(c)] = { saved: t, c: { id: c.id, title: c.title, summary: c.summary || "", links: c.links, outlets: c.outlets, time: c.time, section: c.section, signal: c.signal || "" } };
+    delete laterGone[laterKey(c)];
+  }
+  store.set("later", later); store.set("laterGone", laterGone);
+}
+
+// ---- Read later sync: a code you copy on one device and paste on another. No server involved.
+const b64 = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64 = str => Uint8Array.from(atob(str.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0));
+async function pipe(bytes, stream) { return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer()); }
+async function makeSyncCode() {
+  const json = new TextEncoder().encode(JSON.stringify({ s: later, g: laterGone }));
+  if (window.CompressionStream) return "DB1." + b64(await pipe(json, new CompressionStream("gzip")));
+  return "DB0." + b64(json);
+}
+async function readSyncCode(code) {
+  const m = code.trim().replace(/\s+/g, "").match(/^DB([01])\.([A-Za-z0-9_-]+)$/);
+  if (!m) throw new Error("That doesn't look like a sync code.");
+  let bytes = unb64(m[2]);
+  if (m[1] === "1") bytes = await pipe(bytes, new DecompressionStream("gzip"));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+// Merge: the newer of "saved" and "removed" wins for each story, on both sides.
+function mergeLater(other) {
+  let added = 0, removed = 0;
+  for (const [k, v] of Object.entries(other.s || {})) {
+    if (later[k] || (laterGone[k] || 0) >= v.saved) continue;
+    later[k] = v; delete laterGone[k]; added++;
+  }
+  for (const [k, t] of Object.entries(other.g || {})) {
+    if (later[k] && later[k].saved < t) { delete later[k]; removed++; }
+    if (!later[k]) laterGone[k] = Math.max(laterGone[k] || 0, t);
+  }
+  store.set("later", later); store.set("laterGone", laterGone);
+  return { added, removed };
 }
 
 // "New" = first seen after your previous visit (a visit = 30+ minutes since the last one).
@@ -263,14 +310,21 @@ function renderList() {
     list = list.filter(c => c.links.some(l => l.title.toLowerCase().includes(q) || l.outlet.toLowerCase().includes(q)) || c.summary.toLowerCase().includes(q));
   }
   const notes = {
-    later: "Stories you saved with the bookmark button, read or not. They stay here, even after they leave the rest of the page, until you tap the bookmark again. Saved only in this browser.",
+    later: "Stories you saved with the bookmark button, read or not. They stay here, even after they leave the rest of the page, until you tap the bookmark again. Saved in this browser; use Sync to copy them to another device.",
     held: "Stories kept off the main page: rumors and clickbait, and stories only one outlet covered that showed no sign of being important (not on NYT's front page or in WaPo's The 7, no scoop or feature language). Nothing here is counted in the other tabs.",
     promoted: "Stories the Claude review moved onto the main page from Held back, with its reason. To reverse one, add its id under \"hide\" in review/overrides.json (or ask Claude Code to). Reversals show here as \"Hidden by you\", and the reviewer learns from them.",
     demoted: "Stories the Claude review took off the main page, with its reason. To reverse one, add its id under \"keep\" in review/overrides.json (or ask Claude Code to). Reversals show here as \"Kept by you\", and the reviewer learns from them.",
   };
-  const note = notes[state.tab] ? `<p class="note">${notes[state.tab]}</p>` : "";
+  let note = notes[state.tab] ? `<p class="note">${notes[state.tab]}</p>` : "";
+  if (state.tab === "later" && state.syncOpen) note += `<div class="sync">
+    <p>Copy a sync code here and paste it on your other device (or in the home-screen app). Pasting merges: stories saved on either side are kept, and ones you removed stay removed. Do it both ways to match fully.</p>
+    <div class="row"><button class="btn" id="syncCopy">Copy sync code</button>${navigator.share ? '<button class="btn" id="syncShare">Share…</button>' : ""}</div>
+    <textarea id="syncIn" placeholder="Paste a sync code from your other device" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <div class="row"><button class="btn" id="syncMerge">Merge into this device</button></div>
+    <p class="msg" id="syncMsg">${esc(state.syncMsg || "")}</p></div>`;
   if (!list.length) return note + `<p class="empty">${state.tab === "later" ? "Nothing saved yet. Tap the bookmark on any story." : state.hideRead ? "All caught up." : "Nothing here yet."}</p>`;
-  if (state.tab === "top" || state.tab === "later") return list.map(card).join("");
+  if (state.tab === "top") return list.map(card).join("");
+  if (state.tab === "later") return note + list.map(card).join("");
   let out = note, last = "";
   for (const c of list) {
     const d = dayLabel(c.time);
@@ -297,6 +351,9 @@ function render() {
   const status = state.tab === "status";
   document.getElementById("toolbar").style.display = status ? "none" : "";
   document.getElementById("hideRead").setAttribute("aria-pressed", state.hideRead);
+  const sb = document.getElementById("syncBtn");
+  sb.style.display = state.tab === "later" ? "" : "none";
+  sb.setAttribute("aria-pressed", !!state.syncOpen);
   document.getElementById("main").innerHTML = status ? renderStatus() : renderList();
 }
 
@@ -305,11 +362,26 @@ function markRead(ids, value) {
   for (const id of ids) { if (value) read[id] = t; else delete read[id]; }
   store.set("read", read);
 }
+function setSyncMsg(m) { state.syncMsg = m; const el = document.getElementById("syncMsg"); if (el) el.textContent = m; }
 const byId = id => DATA.clusters.find(c => c.id === id) || DATA.held.find(c => c.id === id) || Object.values(later).map(v => v.c).find(c => c.id === id);
 
 document.addEventListener("click", e => {
   const tab = e.target.closest("[data-tab]");
   if (tab) { state.tab = tab.dataset.tab; store.set("tab", state.tab); render(); window.scrollTo({ top: 0 }); return; }
+  if (e.target.closest("#syncBtn")) { state.syncOpen = !state.syncOpen; state.syncMsg = ""; render(); return; }
+  if (e.target.closest("#syncCopy")) {
+    makeSyncCode().then(code => navigator.clipboard.writeText(code))
+      .then(() => setSyncMsg(`Copied a code for ${Object.keys(later).length} saved stories. Paste it on your other device.`))
+      .catch(() => setSyncMsg("Couldn't copy automatically. Try Share… instead, or tap Copy again."));
+    return;
+  }
+  if (e.target.closest("#syncShare")) { makeSyncCode().then(code => navigator.share({ text: code })).catch(() => {}); return; }
+  if (e.target.closest("#syncMerge")) {
+    readSyncCode(document.getElementById("syncIn").value)
+      .then(other => { const { added, removed } = mergeLater(other); state.syncMsg = `Merged: ${added} added, ${removed} removed.`; render(); })
+      .catch(err => setSyncMsg(err.message.startsWith("That") ? err.message : "That code couldn't be read. Copy it again and paste the whole thing."));
+    return;
+  }
   const sv = e.target.closest("[data-later]");
   if (sv) { toggleLater(byId(sv.dataset.later)); render(); return; }
   const tog = e.target.closest("[data-toggle]");
