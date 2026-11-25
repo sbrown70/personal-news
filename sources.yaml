@@ -184,8 +184,13 @@ sources:
   - name: Classic Motorsports
     outlet: Classic Motorsports
     section: cars
-    # No public feed on the site.
+    # No public feed on the site, and the Google News search covers the whole site,
+    # so drop the forum threads, tag pages and member profiles it also picks up.
     google_news: true
+    exclude_titles:
+      - "\\|[^|]*\\bforums?\\s*\\|?\\s*$"                       # "Meme Thread...| Off-Topic Discussion forum |"
+      - "articles, project cars, conversations, and more$"     # tag pages
+      - "has posted \\d+ times in the forums"                  # member profiles
     urls: ["https://news.google.com/rss/search?q=site:classicmotorsports.com+when:7d&hl=en-US&gl=US&ceid=US:en"]
 
   - name: GM Authority
