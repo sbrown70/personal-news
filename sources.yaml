@@ -120,6 +120,18 @@ sources:
     rumor_rules: true
     drop_question_headlines: true
     pass_authors: [David Adler, Mike Petriello, Tom Tango]
+    # Reported transactions, hires and injuries pass even when only one outlet has them.
+    # Shared with The Athletic MLB and ESPN MLB below (*transactions).
+    pass_keywords: &transactions
+      - "\\(sources?\\)"                 # "... on 1-year contract (source)"
+      - "\\bsources?\\s*$"               # "...: Sources"
+      - "\\b\\d+-year\\b"                # "3-year, $48 million deal"
+      - "\\bagree(s|d)? (to|on)\\b"
+      - "\\bre-signs?\\b"
+      - "\\bbring(s|ing)? back\\b"
+      - "\\b(joins|joining)\\b"
+      - "\\b(to hire|hires|hired|named)\\b"
+      - "\\b(surgery|torn|fractured?)\\b"
     urls: [https://www.mlb.com/feeds/news/rss.xml]
 
   # Listed before "The Athletic MLB" so these own any story that appears in both
@@ -141,6 +153,7 @@ sources:
     section: baseball
     gate: true
     rumor_rules: true
+    pass_keywords: *transactions
     urls: [https://www.nytimes.com/athletic/rss/mlb/]
 
   # ---------- From Feedly: Baseball ----------
@@ -158,6 +171,7 @@ sources:
     google_news: true
     gate: true
     rumor_rules: true
+    pass_keywords: *transactions
     urls: ["https://news.google.com/rss/search?q=site:espn.com/mlb/story+when:3d&hl=en-US&gl=US&ceid=US:en"]
 
   - name: FanGraphs
